@@ -34,8 +34,11 @@
 │  │  ┌─────────────────────────────────────────────────┐  │   │
 │  │  │           waitlist table                        │  │   │
 │  │  │  ┌──────────┬─────────────┬───────────────────┐ │  │   │
-│  │  │  │ id (PK)  │ email (UQ)  │ created_at        │ │  │   │
-│  │  │  │ uuid     │ varchar     │ timestamptz       │ │  │   │
+│  │  │  │ id (PK)  │ email (UQ)  │ name              │ │  │   │
+│  │  │  │ uuid     │ varchar     │ varchar           │ │  │   │
+│  │  │  ├──────────┼─────────────┼───────────────────┤ │  │   │
+│  │  │  │ location │ created_at  │                   │ │  │   │
+│  │  │  │ varchar  │ timestamptz │                   │ │  │   │
 │  │  │  └──────────┴─────────────┴───────────────────┘ │  │   │
 │  │  └─────────────────────────────────────────────────┘  │   │
 │  └───────────────────────────────────────────────────────┘   │
@@ -136,6 +139,43 @@ Database (SQLx + PostgreSQL)
 | Validation | validator | Input validation |
 | Logging | tracing | Structured logging |
 | Serialization | serde | JSON handling |
+| Geolocation | ipapi.co | IP to location lookup |
+
+## Geolocation Feature
+
+The waitlist endpoint automatically detects user location through multiple methods:
+
+1. **Browser Geolocation API** (Primary): Uses the browser's `navigator.geolocation` to get precise coordinates, then reverse geocodes to a human-readable location.
+
+2. **IP-based Geolocation** (Fallback): If browser geolocation is denied or unavailable, the server extracts the client IP using `axum-client-ip` and queries ipapi.co for location data.
+
+3. **Manual Input** (Override): Users can manually enter their location, which takes precedence over automatic detection.
+
+### Location Detection Flow
+
+```
+User submits waitlist form
+       ↓
+Frontend checks browser geolocation
+       ↓
+If available → Reverse geocode to city/region/country
+       ↓
+Send location to backend with name/email
+       ↓
+If no browser location → Backend extracts IP from request
+       ↓
+Query ipapi.co for location data
+       ↓
+Store in database with name, email, and location
+```
+
+### Dependencies for Geolocation
+
+```toml
+# In Cargo.toml
+reqwest = { version = "0.12", features = ["json"] }
+axum-client-ip = "1.0"
+```
 
 ## Extending the Architecture
 

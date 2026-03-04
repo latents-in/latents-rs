@@ -53,6 +53,12 @@ chrono = { version = "0.4", features = ["serde"] }
 # UUID
 uuid = { version = "1.15", features = ["v4", "serde"] }
 
+# HTTP client for geolocation
+reqwest = { version = "0.12", features = ["json"] }
+
+# IP extraction
+axum-client-ip = "1.0"
+
 [profile.release]
 opt-level = 3
 lto = true

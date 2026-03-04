@@ -47,6 +47,12 @@ tracing-subscriber.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 
+# HTTP client for geolocation
+reqwest.workspace = true
+
+# IP extraction
+axum-client-ip.workspace = true
+
 [lib]
 name = "latents_server"
 path = "src/lib.rs"

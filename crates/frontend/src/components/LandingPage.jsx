@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { cn } from '../lib/utils';
@@ -15,12 +15,52 @@ import dollarImg from '../assets/dollar.webp';
 
 export default function LandingPage() {
     const [email, setEmail] = useState('');
+    const [name, setName] = useState('');
+    const [location, setLocation] = useState('');
     const [status, setStatus] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [browserLocation, setBrowserLocation] = useState(null);
+
+    // Try to get browser geolocation on component mount
+    useEffect(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    // Get location from coordinates using reverse geocoding
+                    fetchLocationFromCoords(position.coords.latitude, position.coords.longitude);
+                },
+                (error) => {
+                    console.log('Browser geolocation denied or failed:', error);
+                    // Location will be detected server-side from IP
+                },
+                { timeout: 5000, enableHighAccuracy: false }
+            );
+        }
+    }, []);
+
+    // Fetch location from coordinates using a free reverse geocoding API
+    const fetchLocationFromCoords = async (lat, lon) => {
+        try {
+            const response = await fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`);
+            if (response.ok) {
+                const data = await response.json();
+                const locationParts = [];
+                if (data.city) locationParts.push(data.city);
+                if (data.principalSubdivision) locationParts.push(data.principalSubdivision);
+                if (data.countryName) locationParts.push(data.countryName);
+                
+                if (locationParts.length > 0) {
+                    setBrowserLocation(locationParts.join(', '));
+                }
+            }
+        } catch (error) {
+            console.log('Failed to get location from coordinates:', error);
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!email) return;
+        if (!email || !name) return;
 
         setIsLoading(true);
         setStatus('');
@@ -28,23 +68,42 @@ export default function LandingPage() {
         try {
             // Use relative URL when frontend and API are same origin
             const API_URL = import.meta.env.VITE_API_URL || '';
-            const response = await fetch(`${API_URL}/api/waitlist`, {
+            const fullUrl = `${API_URL}/api/waitlist`;
+
+            // Use browser location if available, otherwise the location input, otherwise server will detect from IP
+            const locationToSend = browserLocation || location || undefined;
+
+            const payload = {
+                email,
+                name,
+                location: locationToSend
+            };
+
+            console.log('Sending request to:', fullUrl);
+            console.log('Payload:', payload);
+
+            const response = await fetch(fullUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
+                body: JSON.stringify(payload),
             });
 
+            console.log('Response status:', response.status);
+
             const data = await response.json();
+            console.log('Response data:', data);
 
             if (response.ok) {
                 setStatus('success');
                 setEmail('');
+                setName('');
+                setLocation('');
             } else {
-                setStatus(data.error || 'Something went wrong.');
+                setStatus(data.message || data.error || 'Something went wrong.');
             }
         } catch (error) {
             console.error("Submission error:", error);
-            setStatus('Failed to connect to the server.');
+            setStatus('Failed to connect to the server: ' + error.message);
         } finally {
             setIsLoading(false);
         }
@@ -87,28 +146,71 @@ export default function LandingPage() {
                     <span className="text-[#1d1d1f] font-semibold">Start Acting.</span>
                 </motion.p>
 
+                {/* Waitlist Form */}
                 <motion.form
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
                     onSubmit={handleSubmit}
-                    className="relative w-full max-w-[460px] mx-auto p-1.5 rounded-full bg-white/70 backdrop-blur-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.04] transition-all duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:bg-white/80 focus-within:bg-white focus-within:ring-2 focus-within:ring-black/10 focus-within:shadow-[0_8px_32px_rgba(0,0,0,0.1)]"
+                    className="w-full max-w-[460px] mx-auto"
                 >
-                    <input
-                        type="email"
-                        placeholder="Enter your email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="w-full pl-5 pr-[120px] py-3 rounded-full focus:outline-none bg-transparent text-[15px] sm:text-[17px] text-[#1d1d1f] font-medium placeholder:text-[#86868b] placeholder:font-normal"
-                    />
-                    <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="absolute right-1.5 top-1/2 -translate-y-1/2 px-4 sm:px-5 h-[42px] bg-[#1d1d1f] hover:bg-black hover:scale-105 active:scale-95 transition-all duration-300 rounded-full flex items-center justify-center text-white text-[13px] sm:text-[15px] font-semibold tracking-wide shadow-sm disabled:opacity-75 disabled:hover:scale-100 disabled:cursor-not-allowed"
-                    >
-                        {isLoading ? 'Joining...' : 'Join Waitlist'}
-                    </button>
+                    {/* Form container */}
+                    <div className="p-4 rounded-3xl bg-white/70 backdrop-blur-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.04] transition-all duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:bg-white/80 focus-within:bg-white focus-within:ring-2 focus-within:ring-black/10 focus-within:shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
+                        {/* Name input */}
+                        <div className="mb-3">
+                            <input
+                                type="text"
+                                placeholder="Your name"
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                required
+                                className="w-full px-4 py-3 rounded-xl focus:outline-none bg-transparent text-[15px] sm:text-[16px] text-[#1d1d1f] font-medium placeholder:text-[#86868b] placeholder:font-normal border-b border-gray-200/50 focus:border-gray-300 transition-colors"
+                            />
+                        </div>
+                        
+                        {/* Email input */}
+                        <div className="mb-3">
+                            <input
+                                type="email"
+                                placeholder="Enter your email"
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                required
+                                className="w-full px-4 py-3 rounded-xl focus:outline-none bg-transparent text-[15px] sm:text-[16px] text-[#1d1d1f] font-medium placeholder:text-[#86868b] placeholder:font-normal border-b border-gray-200/50 focus:border-gray-300 transition-colors"
+                            />
+                        </div>
+
+                        {/* Location input - hidden if browser location is detected */}
+                        {!browserLocation && (
+                            <div className="mb-4">
+                                <input
+                                    type="text"
+                                    placeholder="Your location (optional - auto-detected if empty)"
+                                    value={location}
+                                    onChange={(e) => setLocation(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl focus:outline-none bg-transparent text-[14px] sm:text-[15px] text-[#1d1d1f] font-medium placeholder:text-[#86868b] placeholder:font-normal"
+                                />
+                            </div>
+                        )}
+
+                        {/* Browser location indicator */}
+                        {browserLocation && (
+                            <div className="mb-4 px-4 py-2 rounded-xl bg-green-50/80 border border-green-200">
+                                <p className="text-[13px] text-green-700">
+                                    📍 Location detected: {browserLocation}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Submit button */}
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full px-5 py-3 bg-[#1d1d1f] hover:bg-black hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 rounded-xl flex items-center justify-center text-white text-[15px] sm:text-[16px] font-semibold tracking-wide shadow-sm disabled:opacity-75 disabled:hover:scale-100 disabled:cursor-not-allowed"
+                        >
+                            {isLoading ? 'Joining...' : 'Join Waitlist'}
+                        </button>
+                    </div>
                 </motion.form>
 
                 {/* Status Message */}

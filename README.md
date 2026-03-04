@@ -196,9 +196,27 @@ make test
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/health` | Health check |
-| POST | `/api/waitlist` | Add email to waitlist |
+| POST | `/api/waitlist` | Add email to waitlist (with name and auto-detected location) |
 | GET | `/api/waitlist` | Get all waitlist entries |
 | GET | `/*` | Serve static frontend files |
+
+### Waitlist API
+
+**POST /api/waitlist**
+
+Request body:
+```json
+{
+  "email": "user@example.com",
+  "name": "John Doe",
+  "location": "New York, USA"  // Optional - auto-detected if not provided
+}
+```
+
+Location detection priority:
+1. Location provided in request body
+2. Browser geolocation (reverse geocoded)
+3. IP-based geolocation (server-side)
 
 ## Deployment
 

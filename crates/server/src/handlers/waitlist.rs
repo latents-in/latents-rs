@@ -1,6 +1,6 @@
 use crate::{
     error::{AppError, Result},
-    models::{WaitlistRequest, WaitlistResponse, WaitlistEntry},
+    models::{WaitlistEntry, WaitlistRequest, WaitlistResponse},
     state::AppState,
     db::waitlist as waitlist_db,
 };
@@ -17,12 +17,22 @@ pub async fn add_to_waitlist(
     State(state): State<Arc<AppState>>,
     Json(payload): Json<WaitlistRequest>,
 ) -> Result<impl IntoResponse> {
-    // Validate email
+    // Validate request
     payload.validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
+    // Determine location:
+    // 1. If location is provided in request (from browser geolocation), use it
+    // 2. Otherwise, location is None (no geolocation service configured)
+    let location = payload.location;
+
     // Insert into database
-    let created = waitlist_db::create_waitlist_entry(&state.db, &payload.email).await?;
+    let created = waitlist_db::create_waitlist_entry(
+        &state.db,
+        &payload.email,
+        &payload.name,
+        location.as_deref(),
+    ).await?;
 
     if created {
         Ok((
