@@ -47,6 +47,10 @@ tracing-subscriber.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 
+[lib]
+name = "latents_server"
+path = "src/lib.rs"
+
 [[bin]]
 name = "latents-server"
 path = "src/main.rs"
