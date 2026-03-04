@@ -1,0 +1,34 @@
+[Unit]
+Description=Latents Server (Axum + React frontend)
+After=network.target
+StartLimitBurst=3
+StartLimitInterval=60s
+
+[Service]
+Type=simple
+User=latents
+Group=latents
+WorkingDirectory=/opt/latents
+EnvironmentFile=/opt/latents/config/production.env
+ExecStart=/opt/latents/bin/latents-server
+Restart=always
+RestartSec=5
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/latents/logs
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=latents
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=512
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary-50: #f4f6f8;
+  --color-primary-100: #e5e9f0;
+  --color-primary-200: #ccd4df;
+  --color-primary-300: #a3b5c7;
+  --color-primary-400: #758fa8;
+  --color-primary-500: #54728f;
+  --color-primary-600: #3f5875;
+  --color-primary-700: #344760;
+  --color-primary-800: #2d3d52;
+  --color-primary-900: #283445;
+  --color-primary-950: #1b2330;
+
+  --font-sans: "Selecta Medium", "Selecta Medium Placeholder", sans-serif;
+  --font-display: "Selecta Medium", "Selecta Medium Placeholder", sans-serif;
+
+  --animate-blob: blob 7s infinite;
+  --animate-marquee: marquee 30s linear infinite;
+
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+
+    100% {
+      transform: translate(0px, 0px) scale(1);
+    }
+  }
+
+  @keyframes marquee {
+    0% {
+      transform: translateX(0%);
+    }
+
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+}
+
+:root {
+  --color-acctual-bg: #FFFFFF;
+  /* Pure white background */
+  --color-acctual-card: #FFFFFF;
+  --color-acctual-card-hover: #F3F4F6;
+  --color-acctual-border: rgba(0, 0, 0, 0.08);
+  /* Subtle light border */
+  --color-acctual-text: #000000e6;
+  --color-acctual-muted: #666666;
+}
+
+body {
+  background-color: var(--color-acctual-bg);
+  color: var(--color-acctual-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide scrollbar for clean look */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Acctual Clone Style Utilities */
+@utility acctual-card {
+  background-color: var(--color-acctual-card);
+  border: 1px solid var(--color-acctual-border);
+  border-radius: 20px;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+}
+
+@utility acctual-card-hover {
+  background-color: var(--color-acctual-card-hover);
+  border-color: rgba(0, 0, 0, 0.15);
+}
+
+@utility pill-button {
+  border-radius: 9999px;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  font-family: var(--font-sans);
+}
+
+@utility pill-button-primary {
+  background-color: #000000e6;
+  color: #FFFFFF;
+
+  &:hover {
+    background-color: #000000;
+    transform: scale(0.98);
+  }
+}
+
+@utility pill-button-secondary {
+  background-color: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #000000e6;
+
+  &:hover {
+    background-color: rgba(0, 0, 0, 0.08);
+  }
+}
+
+@utility glass-nav {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
