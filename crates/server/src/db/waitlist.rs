@@ -29,27 +29,23 @@ pub async fn create_waitlist_entry(
     .execute(&mut *tx)
     .await?;
 
-    // 2. Get the created_at of this specific user
-    let user_created_at: chrono::DateTime<Utc> = sqlx::query_scalar(
-        r#"SELECT created_at FROM waitlist WHERE email = $1"#,
+    // 2. Get this user's rank using ROW_NUMBER() which gives a guaranteed unique sequential rank
+    let rank: i64 = sqlx::query_scalar(
+        r#"
+        SELECT row_num FROM (
+            SELECT email, ROW_NUMBER() OVER (ORDER BY created_at ASC, id ASC) as row_num
+            FROM waitlist
+        ) ranked
+        WHERE email = $1
+        "#,
     )
     .bind(email.to_lowercase())
     .fetch_one(&mut *tx)
     .await?;
 
-    // 3. Calculate rank (how many users joined before this user)
-    let count_before: i64 = sqlx::query_scalar(
-        r#"SELECT COUNT(*) FROM waitlist WHERE created_at < $1"#,
-    )
-    .bind(user_created_at)
-    .fetch_one(&mut *tx)
-    .await?;
-
-    let rank = (count_before + 1) as u64;
-
     tx.commit().await?;
 
-    Ok(rank)
+    Ok(rank as u64)
 }
 
 pub async fn get_all_waitlist_entries(db: &PgPool) -> Result<Vec<WaitlistEntry>> {
