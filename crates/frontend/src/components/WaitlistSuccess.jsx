@@ -269,6 +269,17 @@ export default function WaitlistSuccess() {
                 const user = session.user;
                 const metadata = user.user_metadata || {};
 
+                // Read role/name from localStorage (saved before magic link was sent)
+                // This is more reliable than metadata for existing Supabase users
+                const pendingRole = localStorage.getItem('latents_pending_role');
+                const pendingName = localStorage.getItem('latents_pending_name');
+                // Clean up localStorage after reading
+                localStorage.removeItem('latents_pending_role');
+                localStorage.removeItem('latents_pending_name');
+
+                const resolvedRole = pendingRole || metadata.role || null;
+                const resolvedName = pendingName || metadata.full_name || 'Early Adopter';
+
                 setStatus('registering');
 
                 // 2. Register user to our Rust backend to get their Rank
@@ -280,9 +291,9 @@ export default function WaitlistSuccess() {
                     },
                     body: JSON.stringify({
                         email: user.email,
-                        name: metadata.full_name || 'Anonymous',
+                        name: resolvedName,
                         location: metadata.location || 'Unknown',
-                        role: metadata.role || null,
+                        role: resolvedRole,
                     }),
                 });
 
@@ -298,9 +309,9 @@ export default function WaitlistSuccess() {
 
                 // 3. Set standard user data for the visual card
                 setUserData({
-                    name: metadata.full_name || 'Early Adopter',
+                    name: resolvedName,
                     rank: data.rank || 1,
-                    role: data.role || metadata.role || null,
+                    role: resolvedRole || data.role || null,
                 });
 
                 setStatus('success');
