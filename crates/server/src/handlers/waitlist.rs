@@ -25,6 +25,7 @@ pub async fn add_to_waitlist(
     // 1. If location is provided in request (from browser geolocation), use it
     // 2. Otherwise, location is None (no geolocation service configured)
     let location = payload.location;
+    let role = payload.role.clone();
 
     // Insert or get user from database and fetch rank
     let rank = waitlist_db::create_waitlist_entry(
@@ -32,6 +33,7 @@ pub async fn add_to_waitlist(
         &payload.email,
         &payload.name,
         location.as_deref(),
+        payload.role.as_deref(),
     ).await?;
 
     Ok((
@@ -39,6 +41,7 @@ pub async fn add_to_waitlist(
         Json(WaitlistResponse {
             message: "Successfully processed waitlist entry".to_string(),
             rank,
+            role,
         }),
     ))
 }
