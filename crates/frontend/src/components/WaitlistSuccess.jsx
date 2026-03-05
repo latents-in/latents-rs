@@ -233,11 +233,11 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
 
                             {/* Number Indicator */}
                             <div className="flex flex-col items-end text-right">
-                                <span className="font-mono text-[10px] tracking-[0.1em] text-gray-500 uppercase font-bold mb-1">
+                                <span className="font-mono text-[9px] tracking-[0.15em] text-gray-500 uppercase font-bold">
                                     Waitlist Rank
                                 </span>
-                                <div className="font-sans text-xl font-black tracking-tighter text-gray-900 drop-shadow-md">
-                                    {number}
+                                <div className="font-mono text-2xl font-black tracking-tighter text-gray-900 drop-shadow-md leading-tight">
+                                    #{displayNumber}
                                 </div>
                             </div>
                         </div>
