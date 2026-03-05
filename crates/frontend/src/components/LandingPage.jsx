@@ -67,6 +67,12 @@ export default function LandingPage() {
             // Use browser location if available, otherwise just 'Unknown'
             const locationToSend = browserLocation || 'Unknown';
 
+            // Save role + name in localStorage so WaitlistSuccess can read them
+            // after the magic link redirect (Supabase doesn't always update
+            // existing user metadata on repeat OTP sign-ins)
+            if (role) localStorage.setItem('latents_pending_role', role);
+            if (name) localStorage.setItem('latents_pending_name', name);
+
             // Send Magic Link via Supabase Auth
             const { error } = await supabase.auth.signInWithOtp({
                 email: email,
