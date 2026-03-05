@@ -8,14 +8,15 @@ pub async fn create_waitlist_entry(
     email: &str,
     name: &str,
     location: Option<&str>,
+    role: Option<&str>,
 ) -> Result<u64> {
     let mut tx = db.begin().await?;
 
     // 1. Insert the user (or ignore if already exists)
     let _ = sqlx::query(
         r#"
-        INSERT INTO waitlist (id, email, name, location, created_at)
-        VALUES ($1, $2, $3, $4, $5)
+        INSERT INTO waitlist (id, email, name, location, role, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (email) DO NOTHING
         "#,
     )
@@ -23,6 +24,7 @@ pub async fn create_waitlist_entry(
     .bind(email.to_lowercase())
     .bind(name)
     .bind(location)
+    .bind(role)
     .bind(Utc::now())
     .execute(&mut *tx)
     .await?;
@@ -53,7 +55,7 @@ pub async fn create_waitlist_entry(
 pub async fn get_all_waitlist_entries(db: &PgPool) -> Result<Vec<WaitlistEntry>> {
     let rows = sqlx::query(
         r#"
-        SELECT id, email, name, location, created_at
+        SELECT id, email, name, location, role, created_at
         FROM waitlist
         ORDER BY created_at DESC
         "#,
@@ -68,6 +70,7 @@ pub async fn get_all_waitlist_entries(db: &PgPool) -> Result<Vec<WaitlistEntry>>
             email: row.get("email"),
             name: row.get("name"),
             location: row.get("location"),
+            role: row.get("role"),
             created_at: row.get("created_at"),
         })
         .collect();
