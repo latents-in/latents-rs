@@ -168,7 +168,7 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
                 />
 
                 {/* Inner Card (Solid, protects text from mask) */}
-                <div className="absolute inset-[10px] overflow-hidden rounded-md bg-[#FAFAFA] shadow-[inset_0_0_20px_rgba(0,0,0,0.03)]">
+                <div id="waitlist-card-export" className="absolute inset-[10px] overflow-hidden rounded-md bg-[#FAFAFA] shadow-[inset_0_0_20px_rgba(0,0,0,0.03)]">
 
                     {/* Colorful Role Shape Background */}
                     <ShapeComponent />
@@ -203,7 +203,7 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
                         {/* Middle Typography */}
                         <div className="flex flex-col mt-12 mb-auto" style={{ transform: 'translateZ(40px)' }}>
                             <h2 className="font-sans font-black text-5xl leading-[0.9] tracking-tighter mb-4 text-gray-900 break-words drop-shadow-lg">
-                                {name || 'Latents'}
+                                {name || 'Latent'}
                             </h2>
                             <p className="font-mono text-xs uppercase tracking-[0.15em] font-bold text-gray-800 drop-shadow-md">
                                 {displayTitle}
@@ -239,7 +239,7 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
                                     Waitlist Rank
                                 </span>
                                 <div className="font-sans text-xl font-black tracking-tighter text-gray-900 drop-shadow-md">
-                                     {number}
+                                    {number}
                                 </div>
                             </div>
                         </div>
@@ -283,7 +283,8 @@ export default function WaitlistSuccess() {
                     body: JSON.stringify({
                         email: user.email,
                         name: metadata.full_name || 'Anonymous',
-                        location: metadata.location || 'Unknown'
+                        location: metadata.location || 'Unknown',
+                        role: metadata.role || null,
                     }),
                 });
 
@@ -300,7 +301,8 @@ export default function WaitlistSuccess() {
                 // 3. Set standard user data for the visual card
                 setUserData({
                     name: metadata.full_name || 'Early Adopter',
-                    rank: data.rank || 'TBD' // Assuming backend starts returning 'rank'
+                    rank: data.rank || 1,
+                    role: data.role || metadata.role || null,
                 });
 
                 setStatus('success');
@@ -389,16 +391,34 @@ export default function WaitlistSuccess() {
                                 <div className="mx-auto w-16 h-16 bg-green-100/80 rounded-full flex items-center justify-center mb-4">
                                     <Check className="w-8 h-8 text-green-600" />
                                 </div>
-                                <h1 className="text-3xl font-bold text-gray-900 mb-2">You're on the list!</h1>
-                                <p className="text-gray-500">Your spot has been secured successfully.</p>
+                                <h1
+                                    className="text-3xl font-bold mb-3"
+                                    style={{
+                                        background: 'linear-gradient(135deg, #059669, #10b981, #34d399)',
+                                        WebkitBackgroundClip: 'text',
+                                        WebkitTextFillColor: 'transparent',
+                                        backgroundClip: 'text'
+                                    }}
+                                >
+                                    Congratulations✨
+                                </h1>
+                                <p className="text-gray-700 font-medium text-[15px] leading-relaxed max-w-xs mx-auto">
+                                    You'll be among the first 1,000 people to receive a free month of access.
+                                </p>
                             </div>
 
                             {/* Interactive Waitlist Card */}
                             <div className="flex flex-col items-center justify-center w-full mt-4">
                                 <InteractiveStamp
                                     name={userData.name}
-                                    roleId="destiny" // Using destiny as default to show the coolest version
-                                    customRole="LATENT"
+                                    roleId={(() => {
+                                        const r = (userData.role || '').toLowerCase();
+                                        if (r === 'founder') return 'founder';
+                                        if (r === 'student') return 'student';
+                                        if (r === 'artist') return 'artist';
+                                        return 'destiny'; // Others / custom roles get the coolest shape
+                                    })()}
+                                    customRole={(userData.role || 'LATENT').toUpperCase()}
                                     number={userData.rank}
                                     date={new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
                                 />
