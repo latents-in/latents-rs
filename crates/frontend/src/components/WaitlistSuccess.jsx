@@ -3,7 +3,253 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
-import { Check, Loader2 } from 'lucide-react';
+import { Check, Loader2, Command, Share2, Download } from 'lucide-react';
+
+// --- Role-Specific SVGs & Themes ---
+const ShapeFounder = () => (
+    <svg viewBox="0 0 100 100" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-[130%] h-[130%] opacity-90 transition-transform duration-1000 ease-out animate-[spin_40s_linear_infinite]">
+        <defs>
+            <linearGradient id="founderG" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#60A5FA" />
+                <stop offset="100%" stopColor="#3730A3" />
+            </linearGradient>
+        </defs>
+        <path d="M 50 5 C 65 5, 75 15, 75 30 C 90 30, 95 45, 95 50 C 95 55, 90 70, 75 70 C 75 85, 65 95, 50 95 C 35 95, 25 85, 25 70 C 10 70, 5 55, 5 50 C 5 45, 10 30, 25 30 C 25 15, 35 5, 50 5 Z" fill="url(#founderG)" />
+    </svg>
+);
+
+const ShapeStudent = () => (
+    <svg viewBox="0 0 100 100" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-[120%] h-[120%] opacity-90 transition-transform duration-1000 ease-out animate-[spin_30s_linear_infinite_reverse]">
+        <defs>
+            <linearGradient id="studentG" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#FDE047" />
+                <stop offset="100%" stopColor="#EA580C" />
+            </linearGradient>
+        </defs>
+        <g fill="url(#studentG)">
+            <circle cx="50" cy="15" r="16" />
+            <circle cx="75" cy="25" r="16" />
+            <circle cx="85" cy="50" r="16" />
+            <circle cx="75" cy="75" r="16" />
+            <circle cx="50" cy="85" r="16" />
+            <circle cx="25" cy="75" r="16" />
+            <circle cx="15" cy="50" r="16" />
+            <circle cx="25" cy="25" r="16" />
+            <circle cx="50" cy="50" r="30" />
+        </g>
+    </svg>
+);
+
+const ShapeArtist = () => (
+    <svg viewBox="0 0 100 100" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-[120%] h-[120%] opacity-90 transition-transform duration-1000 ease-out animate-[spin_35s_linear_infinite]">
+        <defs>
+            <linearGradient id="artistG" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#F472B6" />
+                <stop offset="100%" stopColor="#9D174D" />
+            </linearGradient>
+        </defs>
+        <g fill="url(#artistG)">
+            <circle cx="50" cy="25" r="26" />
+            <circle cx="75" cy="50" r="26" />
+            <circle cx="50" cy="75" r="26" />
+            <circle cx="25" cy="50" r="26" />
+            <rect x="25" y="25" width="50" height="50" />
+        </g>
+    </svg>
+);
+
+const ShapeDestiny = () => (
+    <svg viewBox="0 0 100 100" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[45%] w-[130%] h-[130%] opacity-90 transition-transform duration-1000 ease-out animate-[spin_25s_linear_infinite_reverse]">
+        <defs>
+            <linearGradient id="destinyG" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#2DD4BF" />
+                <stop offset="50%" stopColor="#C084FC" />
+                <stop offset="100%" stopColor="#F43F5E" />
+            </linearGradient>
+        </defs>
+        <path d="M 50 10 C 85 10, 90 40, 90 65 C 90 90, 65 90, 50 90 C 20 90, 10 70, 10 45 C 10 15, 25 10, 50 10 Z" fill="url(#destinyG)" />
+    </svg>
+);
+
+const ROLES = {
+    founder: { id: 'founder', label: 'Founder', accent: '#3730A3', shape: ShapeFounder },
+    student: { id: 'student', label: 'Student', accent: '#EA580C', shape: ShapeStudent },
+    artist: { id: 'artist', label: 'Artist', accent: '#BE185D', shape: ShapeArtist },
+    destiny: { id: 'destiny', label: 'Define your destiny', accent: '#9333EA', shape: ShapeDestiny },
+};
+
+
+// --- Interactive 3D Stamp Component ---
+const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
+    const cardRef = React.useRef(null);
+    const [transform, setTransform] = useState('');
+    const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
+    const [isHovered, setIsHovered] = useState(false);
+
+    const activeRole = ROLES[roleId] || ROLES.founder;
+    const displayNumber = number.toString().padStart(3, '0');
+
+    // Determine display title
+    const displayTitle = roleId === 'destiny'
+        ? (customRole || 'DESTINY CALLS')
+        : activeRole.label;
+
+    const ShapeComponent = activeRole.shape;
+
+    const handleMove = (clientX, clientY) => {
+        if (!cardRef.current) return;
+        const rect = cardRef.current.getBoundingClientRect();
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+        const centerX = rect.width / 2;
+        const centerY = rect.height / 2;
+        const rotateX = ((y - centerY) / centerY) * -12;
+        const rotateY = ((x - centerX) / centerX) * 12;
+        const glareX = (x / rect.width) * 100;
+        const glareY = (y / rect.height) * 100;
+
+        setTransform(`perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`);
+        setGlare({ x: glareX, y: glareY, opacity: 0.15 });
+    };
+
+    const onMouseMove = (e) => handleMove(e.clientX, e.clientY);
+    const onTouchMove = (e) => handleMove(e.touches[0].clientX, e.touches[0].clientY);
+
+    const handleEnter = () => setIsHovered(true);
+
+    const handleLeave = () => {
+        setIsHovered(false);
+        setTransform('perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)');
+        setGlare({ ...glare, opacity: 0 });
+    };
+
+    return (
+        <div
+            className="relative flex items-center justify-center p-8 transition-all duration-500 ease-out"
+            style={{ perspective: '1000px' }}
+        >
+            {/* Shadow Layer */}
+            <div
+                className="absolute w-[320px] h-[460px] bg-black/50 blur-2xl rounded-xl transition-all duration-300 pointer-events-none"
+                style={{
+                    transform: isHovered ? 'translateY(20px) scale(0.95)' : 'translateY(10px) scale(0.9)',
+                    opacity: isHovered ? 0.8 : 0.5
+                }}
+            />
+
+            {/* The Stamp */}
+            <div
+                id="waitlist-card-export"
+                ref={cardRef}
+                onMouseMove={onMouseMove}
+                onMouseEnter={handleEnter}
+                onMouseLeave={handleLeave}
+                onTouchMove={onTouchMove}
+                onTouchStart={handleEnter}
+                onTouchEnd={handleLeave}
+                onTouchCancel={handleLeave}
+                className="relative w-[340px] h-[480px] transition-transform duration-200 ease-out will-change-transform z-10 touch-none"
+                style={{
+                    transform: transform || 'perspective(1000px) rotateX(0deg) rotateY(0deg)',
+                    transformStyle: 'preserve-3d'
+                }}
+            >
+                {/* Outer Perforated Wrapper (Pure White) */}
+                <div
+                    className="absolute inset-0 bg-white rounded-[2px]"
+                    style={{
+                        WebkitMaskImage: 'radial-gradient(circle, transparent 4px, black 4.5px)',
+                        WebkitMaskSize: '16px 16px',
+                        WebkitMaskPosition: '-8px -8px',
+                        maskImage: 'radial-gradient(circle, transparent 4px, black 4.5px)',
+                        maskSize: '16px 16px',
+                        maskPosition: '-8px -8px',
+                    }}
+                />
+
+                {/* Inner Card (Solid, protects text from mask) */}
+                <div className="absolute inset-[10px] overflow-hidden rounded-md bg-[#FAFAFA] shadow-[inset_0_0_20px_rgba(0,0,0,0.03)]">
+
+                    {/* Colorful Role Shape Background */}
+                    <ShapeComponent />
+
+                    {/* Dynamic Glare Overlay */}
+                    <div
+                        className="absolute inset-0 pointer-events-none transition-opacity duration-300 z-50"
+                        style={{
+                            opacity: glare.opacity,
+                            background: `radial-gradient(circle at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.9) 0%, transparent 60%)`,
+                        }}
+                    />
+
+                    {/* Content Container */}
+                    <div
+                        className="absolute inset-0 flex flex-col justify-between p-8 z-20 pointer-events-none"
+                        style={{ transform: 'translateZ(30px)' }}
+                    >
+                        {/* Top Section */}
+                        <div className="flex justify-between items-start">
+                            <div className="flex flex-col drop-shadow-md">
+                                <span className="font-mono text-[10px] tracking-[0.2em] font-bold mb-1 text-gray-800">
+                                    {date}
+                                </span>
+                                <span className="font-mono text-[10px] tracking-[0.2em] font-bold text-gray-900">
+                                    LATENTS.IN
+                                </span>
+                            </div>
+                            <Command size={18} className="text-gray-800 drop-shadow-md" />
+                        </div>
+
+                        {/* Middle Typography */}
+                        <div className="flex flex-col mt-12 mb-auto" style={{ transform: 'translateZ(40px)' }}>
+                            <h2 className="font-sans font-black text-5xl leading-[0.9] tracking-tighter mb-4 text-gray-900 break-words drop-shadow-lg">
+                                {name || 'Latents'}
+                            </h2>
+                            <p className="font-mono text-xs uppercase tracking-[0.15em] font-bold text-gray-800 drop-shadow-md">
+                                {displayTitle}
+                            </p>
+                        </div>
+
+                        {/* Bottom Badges */}
+                        <div className="flex items-end justify-between w-full" style={{ transform: 'translateZ(20px)' }}>
+                            <div className="flex flex-col gap-4">
+                                <div className="flex -space-x-3 drop-shadow-md">
+                                    <div
+                                        className="w-12 h-12 rounded-full border-[2px] flex items-center justify-center rotate-[-10deg] bg-white/40 backdrop-blur-md z-10"
+                                        style={{ borderColor: activeRole.accent }}
+                                    >
+                                        <div className="text-[8px] font-black tracking-tight text-center leading-[1.1] uppercase" style={{ color: activeRole.accent }}>
+                                            First<br />Mover
+                                        </div>
+                                    </div>
+                                    <div
+                                        className="w-12 h-12 rounded-full border-[2px] flex items-center justify-center bg-white/40 backdrop-blur-md z-0"
+                                        style={{ borderColor: activeRole.accent }}
+                                    >
+                                        <div className="text-sm font-black tracking-tighter" style={{ color: activeRole.accent }}>
+                                            #{displayNumber}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Number Indicator */}
+                            <div className="flex flex-col items-end text-right">
+                                <span className="font-mono text-[10px] tracking-[0.1em] text-gray-500 uppercase font-bold mb-1">
+                                    Waitlist Rank
+                                </span>
+                                <div className="font-sans text-xl font-black tracking-tighter text-gray-900 drop-shadow-md">
+                                     {number}
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
 
 export default function WaitlistSuccess() {
     const navigate = useNavigate();
@@ -147,23 +393,70 @@ export default function WaitlistSuccess() {
                                 <p className="text-gray-500">Your spot has been secured successfully.</p>
                             </div>
 
-                            {/* ✨ PLACEHOLDER FOR USER'S WAITLIST CARD ✨ */}
-                            <div className="w-full aspect-[1.6/1] bg-gradient-to-br from-gray-900 to-black rounded-3xl overflow-hidden relative shadow-2xl border border-gray-800 flex flex-col p-8 justify-between text-white">
-                                <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.1),transparent_50%)] pointer-events-none" />
+                            {/* Interactive Waitlist Card */}
+                            <div className="flex flex-col items-center justify-center w-full mt-4">
+                                <InteractiveStamp
+                                    name={userData.name}
+                                    roleId="destiny" // Using destiny as default to show the coolest version
+                                    customRole="LATENT"
+                                    number={userData.rank}
+                                    date={new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
+                                />
 
-                                <div>
-                                    <p className="text-gray-400 font-medium text-sm tracking-widest uppercase mb-1">Waitlist Member</p>
-                                    <h3 className="text-2xl font-bold font-sans tracking-tight">{userData.name}</h3>
-                                </div>
+                                <div className="flex flex-col sm:flex-row gap-3 mt-6 w-full max-w-[340px]">
+                                    <button
+                                        onClick={async () => {
+                                            const element = document.getElementById('waitlist-card-export');
+                                            if (!element) return;
+                                            try {
+                                                const html2canvas = (await import('html2canvas')).default;
+                                                const canvas = await html2canvas(element, { backgroundColor: null, scale: 2 });
+                                                canvas.toBlob(async (blob) => {
+                                                    const text = `I just joined the Latents waitlist at rank #${userData.rank}! Reserved my spot as a First Mover. Secure yours at latents.in`;
+                                                    const filesArray = [new File([blob], 'latents-stamp.png', { type: blob.type, lastModified: new Date().getTime() })];
 
-                                <div className="flex justify-between items-end">
-                                    <div>
-                                        <p className="text-gray-400 text-sm mb-1">Your Rank</p>
-                                        <p className="text-4xl font-bold tabular-nums">#{userData.rank}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-gray-500 font-mono text-xs mb-1 opacity-50">LATENTS.IO</p>
-                                    </div>
+                                                    if (navigator.share && navigator.canShare({ files: filesArray })) {
+                                                        await navigator.share({
+                                                            title: 'Latents Waitlist',
+                                                            text: text,
+                                                            files: filesArray
+                                                        });
+                                                    } else {
+                                                        // Fallback to copy link if native share isn't supported (e.g. desktop)
+                                                        await navigator.clipboard.writeText(text);
+                                                        alert("Text copied to clipboard! (Your browser doesn't support direct image sharing)");
+                                                    }
+                                                });
+                                            } catch (err) {
+                                                console.error('Failed to share', err);
+                                            }
+                                        }}
+                                        className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-black transition-all shadow-lg"
+                                    >
+                                        <Share2 size={16} />
+                                        <span>Share Stamp</span>
+                                    </button>
+
+                                    <button
+                                        onClick={async () => {
+                                            const element = document.getElementById('waitlist-card-export');
+                                            if (!element) return;
+                                            try {
+                                                const html2canvas = (await import('html2canvas')).default;
+                                                const canvas = await html2canvas(element, { backgroundColor: null, scale: 3 });
+                                                const link = document.createElement('a');
+                                                link.download = `latents-stamp-${userData.rank}.png`;
+                                                link.href = canvas.toDataURL('image/png');
+                                                link.click();
+                                            } catch (err) {
+                                                console.error('Failed to download', err);
+                                            }
+                                        }}
+                                        className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-white text-gray-900 border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
+                                    >
+                                        <Download size={16} />
+                                        <span>Download</span>
+                                    </button>
                                 </div>
                             </div>
 
