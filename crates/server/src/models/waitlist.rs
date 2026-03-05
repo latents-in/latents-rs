@@ -15,6 +15,7 @@ pub struct WaitlistRequest {
 #[derive(Debug, Serialize)]
 pub struct WaitlistResponse {
     pub message: String,
+    pub rank: u64,
 }
 
 #[derive(Debug, Serialize)]

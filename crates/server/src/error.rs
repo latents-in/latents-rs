@@ -22,6 +22,9 @@ pub enum AppError {
     #[error("Not found")]
     NotFound,
 
+    #[error("Unauthorized: {0}")]
+    Unauthorized(String),
+
     #[error("Conflict: {0}")]
     Conflict(String),
 
@@ -38,6 +41,7 @@ impl IntoResponse for AppError {
             }
             AppError::Validation(msg) => (StatusCode::BAD_REQUEST, msg.clone()),
             AppError::NotFound => (StatusCode::NOT_FOUND, self.to_string()),
+            AppError::Unauthorized(msg) => (StatusCode::UNAUTHORIZED, msg.clone()),
             AppError::Conflict(msg) => (StatusCode::CONFLICT, msg.clone()),
             AppError::Internal => {
                 (StatusCode::INTERNAL_SERVER_ERROR, self.to_string())
