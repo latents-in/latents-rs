@@ -89,10 +89,8 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
     const activeRole = ROLES[roleId] || ROLES.founder;
     const displayNumber = number.toString().padStart(3, '0');
 
-    // Determine display title
-    const displayTitle = roleId === 'destiny'
-        ? (customRole || 'DESTINY CALLS')
-        : activeRole.label;
+    // Determine display title — always show customRole if provided
+    const displayTitle = customRole || activeRole.label;
 
     const ShapeComponent = activeRole.shape;
 
@@ -416,9 +414,9 @@ export default function WaitlistSuccess() {
                                         if (r === 'founder') return 'founder';
                                         if (r === 'student') return 'student';
                                         if (r === 'artist') return 'artist';
-                                        return 'destiny'; // Others / custom roles get the coolest shape
+                                        return 'destiny';
                                     })()}
-                                    customRole={(userData.role || 'LATENT').toUpperCase()}
+                                    customRole={(userData.role || 'FIRST MOVER').toUpperCase()}
                                     number={userData.rank}
                                     date={new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
                                 />
@@ -429,26 +427,19 @@ export default function WaitlistSuccess() {
                                             const element = document.getElementById('waitlist-card-export');
                                             if (!element) return;
                                             try {
-                                                const html2canvas = (await import('html2canvas')).default;
-                                                const canvas = await html2canvas(element, { backgroundColor: null, scale: 2 });
-                                                canvas.toBlob(async (blob) => {
-                                                    const text = `I just joined the Latents waitlist at rank #${userData.rank}! Reserved my spot as a First Mover. Secure yours at latents.in`;
-                                                    const filesArray = [new File([blob], 'latents-stamp.png', { type: blob.type, lastModified: new Date().getTime() })];
-
-                                                    if (navigator.share && navigator.canShare({ files: filesArray })) {
-                                                        await navigator.share({
-                                                            title: 'Latents Waitlist',
-                                                            text: text,
-                                                            files: filesArray
-                                                        });
-                                                    } else {
-                                                        // Fallback to copy link if native share isn't supported (e.g. desktop)
-                                                        await navigator.clipboard.writeText(text);
-                                                        alert("Text copied to clipboard! (Your browser doesn't support direct image sharing)");
-                                                    }
-                                                });
+                                                const domtoimage = (await import('dom-to-image-more')).default;
+                                                const blob = await domtoimage.toBlob(element, { quality: 1, scale: 2 });
+                                                const text = `I just joined the Latents waitlist at rank #${userData.rank}! Reserved my spot as a First Mover. Secure yours at latents.in`;
+                                                const filesArray = [new File([blob], 'latents-stamp.png', { type: 'image/png', lastModified: Date.now() })];
+                                                if (navigator.share && navigator.canShare({ files: filesArray })) {
+                                                    await navigator.share({ title: 'Latents Waitlist', text, files: filesArray });
+                                                } else {
+                                                    await navigator.clipboard.writeText(text);
+                                                    alert("Link copied! (Your browser doesn't support native image sharing)");
+                                                }
                                             } catch (err) {
                                                 console.error('Failed to share', err);
+                                                alert('Sharing failed. Try the Download button instead.');
                                             }
                                         }}
                                         className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-black transition-all shadow-lg"
@@ -462,14 +453,15 @@ export default function WaitlistSuccess() {
                                             const element = document.getElementById('waitlist-card-export');
                                             if (!element) return;
                                             try {
-                                                const html2canvas = (await import('html2canvas')).default;
-                                                const canvas = await html2canvas(element, { backgroundColor: null, scale: 3 });
+                                                const domtoimage = (await import('dom-to-image-more')).default;
+                                                const dataUrl = await domtoimage.toPng(element, { quality: 1, scale: 3 });
                                                 const link = document.createElement('a');
                                                 link.download = `latents-stamp-${userData.rank}.png`;
-                                                link.href = canvas.toDataURL('image/png');
+                                                link.href = dataUrl;
                                                 link.click();
                                             } catch (err) {
                                                 console.error('Failed to download', err);
+                                                alert('Download failed. Please try again.');
                                             }
                                         }}
                                         className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-white text-gray-900 border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
