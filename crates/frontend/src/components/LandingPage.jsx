@@ -59,7 +59,7 @@ export default function LandingPage() {
         }
     };
 
-    const handleJoinSubmit = async ({ name, email }) => {
+    const handleJoinSubmit = async ({ name, email, role }) => {
         setIsLoading(true);
         setStatus('');
 
@@ -75,6 +75,7 @@ export default function LandingPage() {
                     data: {
                         full_name: name,
                         location: locationToSend,
+                        role: role || 'Unknown',
                     },
                     // Redirect back to home so we can intercept the auth change and register them
                     emailRedirectTo: `${window.location.origin}/verify`
@@ -174,7 +175,7 @@ export default function LandingPage() {
                                 }`}
                         >
                             {status === 'magic_link_sent'
-                                ? '✨ Magic link sent! Please check your email inbox to verify and join.'
+                                ? <span>✨ Magic link sent! Check your inbox — <strong>don't forget to look in your Promotions tab</strong> if you don't see it.</span>
                                 : status}
                         </motion.div>
                     )}
