@@ -17,7 +17,9 @@ pub async fn create_waitlist_entry(
         r#"
         INSERT INTO waitlist (id, email, name, location, role, created_at)
         VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (email) DO NOTHING
+        ON CONFLICT (email) DO UPDATE SET
+            role = CASE WHEN waitlist.role IS NULL THEN EXCLUDED.role ELSE waitlist.role END,
+            name = CASE WHEN waitlist.name IS NULL THEN EXCLUDED.name ELSE waitlist.name END
         "#,
     )
     .bind(uuid::Uuid::new_v4().to_string())
