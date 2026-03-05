@@ -8,13 +8,15 @@ pub async fn create_waitlist_entry(
     email: &str,
     name: &str,
     location: Option<&str>,
-) -> Result<bool> {
-    let result = sqlx::query(
+) -> Result<u64> {
+    let mut tx = db.begin().await?;
+
+    // 1. Insert the user (or ignore if already exists)
+    let _ = sqlx::query(
         r#"
         INSERT INTO waitlist (id, email, name, location, created_at)
         VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (email) DO NOTHING
-        RETURNING id
         "#,
     )
     .bind(uuid::Uuid::new_v4().to_string())
@@ -22,10 +24,30 @@ pub async fn create_waitlist_entry(
     .bind(name)
     .bind(location)
     .bind(Utc::now())
-    .fetch_optional(db)
+    .execute(&mut *tx)
     .await?;
 
-    Ok(result.is_some())
+    // 2. Get the created_at of this specific user
+    let user_created_at: chrono::DateTime<Utc> = sqlx::query_scalar(
+        r#"SELECT created_at FROM waitlist WHERE email = $1"#,
+    )
+    .bind(email.to_lowercase())
+    .fetch_one(&mut *tx)
+    .await?;
+
+    // 3. Calculate rank (how many users joined before this user)
+    let count_before: i64 = sqlx::query_scalar(
+        r#"SELECT COUNT(*) FROM waitlist WHERE created_at < $1"#,
+    )
+    .bind(user_created_at)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    let rank = (count_before + 1) as u64;
+
+    tx.commit().await?;
+
+    Ok(rank)
 }
 
 pub async fn get_all_waitlist_entries(db: &PgPool) -> Result<Vec<WaitlistEntry>> {

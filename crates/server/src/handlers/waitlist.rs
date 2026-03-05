@@ -26,24 +26,21 @@ pub async fn add_to_waitlist(
     // 2. Otherwise, location is None (no geolocation service configured)
     let location = payload.location;
 
-    // Insert into database
-    let created = waitlist_db::create_waitlist_entry(
+    // Insert or get user from database and fetch rank
+    let rank = waitlist_db::create_waitlist_entry(
         &state.db,
         &payload.email,
         &payload.name,
         location.as_deref(),
     ).await?;
 
-    if created {
-        Ok((
-            StatusCode::CREATED,
-            Json(WaitlistResponse {
-                message: "Email added successfully".to_string(),
-            }),
-        ))
-    } else {
-        Err(AppError::Conflict("Email already on the waitlist".to_string()))
-    }
+    Ok((
+        StatusCode::OK,
+        Json(WaitlistResponse {
+            message: "Successfully processed waitlist entry".to_string(),
+            rank,
+        }),
+    ))
 }
 
 pub async fn get_waitlist(

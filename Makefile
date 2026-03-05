@@ -88,9 +88,9 @@ pre-deploy-backup:
 
 ## Health check
 health-check:
-	@echo "Checking health at localhost:5000/api/health..."
+	@echo "Checking health at localhost:8080/api/health..."
 	@sleep 2
-	@curl -s http://localhost:5000/api/health || (echo "Health check failed"; exit 1)
+	@curl -s http://localhost:8080/api/health || (echo "Health check failed"; exit 1)
 
 ## Deploy to production server
 deploy: build pre-deploy-backup
@@ -174,7 +174,7 @@ docker-build:
 	docker build -t latents .
 
 docker-run:
-	docker run -p 5000:5000 --env-file .env latents
+	docker run -p 8080:8080 --env-file .env latents
 
 # =============================================================================
 # Installation & Setup

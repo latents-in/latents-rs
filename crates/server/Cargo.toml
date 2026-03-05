@@ -52,6 +52,7 @@ reqwest.workspace = true
 
 # IP extraction
 axum-client-ip.workspace = true
+jsonwebtoken = "10.3.0"
 
 [lib]
 name = "latents_server"

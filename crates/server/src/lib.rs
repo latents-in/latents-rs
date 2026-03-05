@@ -5,6 +5,7 @@ pub mod handlers;
 pub mod models;
 pub mod services;
 pub mod state;
+pub mod auth;
 
 pub use config::Config;
 pub use error::{AppError, ErrorResponse, Result};

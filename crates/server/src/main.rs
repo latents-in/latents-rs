@@ -46,7 +46,7 @@ async fn main() -> anyhow::Result<()> {
     sqlx::migrate!("./migrations").run(&pool).await?;
     info!("Migrations completed");
 
-    let state = Arc::new(AppState::new(pool));
+    let state = Arc::new(AppState::new(pool, config.supabase_jwt_secret));
 
     // CORS configuration
     let cors = CorsLayer::new()

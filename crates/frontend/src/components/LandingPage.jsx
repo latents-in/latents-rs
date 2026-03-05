@@ -1,7 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { cn } from '../lib/utils';
+import { supabase } from '../lib/supabase';
+import JoinWaitlistModal from './JoinWaitlistModal';
+
 import one from '../assets/1.webp';
 import four from '../assets/4.webp';
 import five from '../assets/5.webp';
@@ -14,9 +17,7 @@ import ten from '../assets/10.webp';
 import dollarImg from '../assets/dollar.webp';
 
 export default function LandingPage() {
-    const [email, setEmail] = useState('');
-    const [name, setName] = useState('');
-    const [location, setLocation] = useState('');
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [status, setStatus] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [browserLocation, setBrowserLocation] = useState(null);
@@ -48,7 +49,7 @@ export default function LandingPage() {
                 if (data.city) locationParts.push(data.city);
                 if (data.principalSubdivision) locationParts.push(data.principalSubdivision);
                 if (data.countryName) locationParts.push(data.countryName);
-                
+
                 if (locationParts.length > 0) {
                     setBrowserLocation(locationParts.join(', '));
                 }
@@ -58,52 +59,35 @@ export default function LandingPage() {
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        if (!email || !name) return;
-
+    const handleJoinSubmit = async ({ name, email }) => {
         setIsLoading(true);
         setStatus('');
 
         try {
-            // Use relative URL when frontend and API are same origin
-            const API_URL = import.meta.env.VITE_API_URL || '';
-            const fullUrl = `${API_URL}/api/waitlist`;
+            // Use browser location if available, otherwise just 'Unknown'
+            const locationToSend = browserLocation || 'Unknown';
 
-            // Use browser location if available, otherwise the location input, otherwise server will detect from IP
-            const locationToSend = browserLocation || location || undefined;
-
-            const payload = {
-                email,
-                name,
-                location: locationToSend
-            };
-
-            console.log('Sending request to:', fullUrl);
-            console.log('Payload:', payload);
-
-            const response = await fetch(fullUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
+            // Send Magic Link via Supabase Auth
+            const { error } = await supabase.auth.signInWithOtp({
+                email: email,
+                options: {
+                    // Send user metadata to Supabase so we have it after they click the link
+                    data: {
+                        full_name: name,
+                        location: locationToSend,
+                    },
+                    // Redirect back to home so we can intercept the auth change and register them
+                    emailRedirectTo: `${window.location.origin}/verify`
+                }
             });
 
-            console.log('Response status:', response.status);
+            if (error) throw error;
 
-            const data = await response.json();
-            console.log('Response data:', data);
-
-            if (response.ok) {
-                setStatus('success');
-                setEmail('');
-                setName('');
-                setLocation('');
-            } else {
-                setStatus(data.message || data.error || 'Something went wrong.');
-            }
+            setStatus('magic_link_sent');
+            setIsModalOpen(false);
         } catch (error) {
             console.error("Submission error:", error);
-            setStatus('Failed to connect to the server: ' + error.message);
+            setStatus('Failed to send magic link: ' + error.message);
         } finally {
             setIsLoading(false);
         }
@@ -146,86 +130,55 @@ export default function LandingPage() {
                     <span className="text-[#1d1d1f] font-semibold">Start Acting.</span>
                 </motion.p>
 
-                {/* Waitlist Form */}
-                <motion.form
+                {/* Join Waitlist Button */}
+                <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
-                    onSubmit={handleSubmit}
-                    className="w-full max-w-[460px] mx-auto"
+                    className="w-full max-w-[300px] mx-auto"
                 >
-                    {/* Form container */}
-                    <div className="p-4 rounded-3xl bg-white/70 backdrop-blur-2xl border border-white/60 shadow-[0_8px_32px_rgba(0,0,0,0.06)] ring-1 ring-black/[0.04] transition-all duration-300 hover:shadow-[0_8px_32px_rgba(0,0,0,0.08)] hover:bg-white/80 focus-within:bg-white focus-within:ring-2 focus-within:ring-black/10 focus-within:shadow-[0_8px_32px_rgba(0,0,0,0.1)]">
-                        {/* Name input */}
-                        <div className="mb-3">
-                            <input
-                                type="text"
-                                placeholder="Your name"
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                required
-                                className="w-full px-4 py-3 rounded-xl focus:outline-none bg-transparent text-[15px] sm:text-[16px] text-[#1d1d1f] font-medium placeholder:text-[#86868b] placeholder:font-normal border-b border-gray-200/50 focus:border-gray-300 transition-colors"
-                            />
-                        </div>
-                        
-                        {/* Email input */}
-                        <div className="mb-3">
-                            <input
-                                type="email"
-                                placeholder="Enter your email"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                                className="w-full px-4 py-3 rounded-xl focus:outline-none bg-transparent text-[15px] sm:text-[16px] text-[#1d1d1f] font-medium placeholder:text-[#86868b] placeholder:font-normal border-b border-gray-200/50 focus:border-gray-300 transition-colors"
-                            />
-                        </div>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="w-full px-8 py-4 bg-[#1d1d1f] hover:bg-black hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 rounded-full flex items-center justify-center text-white text-[16px] sm:text-[18px] font-bold tracking-wide shadow-lg border border-black/10"
+                    >
+                        Join the Waitlist
+                    </button>
 
-                        {/* Location input - hidden if browser location is detected */}
-                        {!browserLocation && (
-                            <div className="mb-4">
-                                <input
-                                    type="text"
-                                    placeholder="Your location (optional - auto-detected if empty)"
-                                    value={location}
-                                    onChange={(e) => setLocation(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl focus:outline-none bg-transparent text-[14px] sm:text-[15px] text-[#1d1d1f] font-medium placeholder:text-[#86868b] placeholder:font-normal"
-                                />
-                            </div>
-                        )}
+                    {/* Tiny secure note */}
+                    <p className="text-[12px] text-gray-400 mt-4 font-medium flex items-center justify-center gap-1.5">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Secured by Magic Link
+                    </p>
+                </motion.div>
 
-                        {/* Browser location indicator */}
-                        {browserLocation && (
-                            <div className="mb-4 px-4 py-2 rounded-xl bg-green-50/80 border border-green-200">
-                                <p className="text-[13px] text-green-700">
-                                    📍 Location detected: {browserLocation}
-                                </p>
-                            </div>
-                        )}
-
-                        {/* Submit button */}
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full px-5 py-3 bg-[#1d1d1f] hover:bg-black hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 rounded-xl flex items-center justify-center text-white text-[15px] sm:text-[16px] font-semibold tracking-wide shadow-sm disabled:opacity-75 disabled:hover:scale-100 disabled:cursor-not-allowed"
-                        >
-                            {isLoading ? 'Joining...' : 'Join Waitlist'}
-                        </button>
-                    </div>
-                </motion.form>
+                <JoinWaitlistModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSubmit={handleJoinSubmit}
+                    isLoading={isLoading}
+                    browserLocation={browserLocation}
+                />
 
                 {/* Status Message */}
-                {status && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className={`mt-4 text-[14px] font-medium tracking-tight px-4 py-2 rounded-full border backdrop-blur-md ${status === 'success'
-                            ? 'bg-green-50/80 text-green-700 border-green-200'
-                            : 'bg-red-50/80 text-red-700 border-red-200'
-                            }`}
-                    >
-                        {status === 'success' ? 'Thanks for joining our waitlist!' : status}
-                    </motion.div>
-                )}
+                <AnimatePresence>
+                    {status && (
+                        <motion.div
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className={`mt-6 text-[15px] font-medium tracking-tight px-6 py-3 rounded-full border backdrop-blur-md shadow-sm ${status === 'magic_link_sent'
+                                ? 'bg-green-50/90 text-green-800 border-green-200'
+                                : 'bg-red-50/90 text-red-800 border-red-200'
+                                }`}
+                        >
+                            {status === 'magic_link_sent'
+                                ? '✨ Magic link sent! Please check your email inbox to verify and join.'
+                                : status}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
 
