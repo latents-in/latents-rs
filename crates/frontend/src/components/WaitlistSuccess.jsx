@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
-import { Check, Loader2, Command, Share2, Download } from 'lucide-react';
+import { Check, Loader2, Download } from 'lucide-react';
+import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 // --- Role-Specific SVGs & Themes ---
 const ShapeFounder = () => (
@@ -409,10 +410,13 @@ export default function WaitlistSuccess() {
                                         backgroundClip: 'text'
                                     }}
                                 >
-                                    Congratulations✨
+                                    Congratulations<span style={{ WebkitTextFillColor: '#F59E0B', color: '#F59E0B' }}>✨</span>
                                 </h1>
                                 <p className="text-gray-700 font-medium text-[15px] leading-relaxed max-w-xs mx-auto">
-                                    You'll be among the first 1,000 people to receive a free month of access.
+                                    You'll be among the first{' '}
+                                    <strong className="font-black text-gray-900">1,000</strong>{' '}
+                                    <span className="font-semibold tracking-wide">PEOPLE</span>{' '}to receive a{' '}
+                                    <strong className="font-black uppercase text-gray-900">Free Month</strong>{' '}of access.
                                 </p>
                             </div>
 
@@ -432,40 +436,35 @@ export default function WaitlistSuccess() {
                                     date={new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()}
                                 />
 
-                                <div className="flex flex-col sm:flex-row gap-3 mt-6 w-full max-w-[340px]">
-                                    <button
-                                        onClick={async () => {
-                                            const element = document.getElementById('waitlist-card-export');
-                                            if (!element) return;
-                                            try {
-                                                const domtoimage = (await import('dom-to-image-more')).default;
-                                                const blob = await domtoimage.toBlob(element, { quality: 1, scale: 2 });
-                                                const text = `I just joined the Latents waitlist at rank #${userData.rank}! Reserved my spot as a First Mover. Secure yours at latents.in`;
-                                                const filesArray = [new File([blob], 'latents-stamp.png', { type: 'image/png', lastModified: Date.now() })];
-                                                if (navigator.share && navigator.canShare({ files: filesArray })) {
-                                                    await navigator.share({ title: 'Latents Waitlist', text, files: filesArray });
-                                                } else {
-                                                    await navigator.clipboard.writeText(text);
-                                                    alert("Link copied! (Your browser doesn't support native image sharing)");
-                                                }
-                                            } catch (err) {
-                                                console.error('Failed to share', err);
-                                                alert('Sharing failed. Try the Download button instead.');
-                                            }
-                                        }}
-                                        className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-black transition-all shadow-lg"
-                                    >
-                                        <Share2 size={16} />
-                                        <span>Share Stamp</span>
-                                    </button>
+                                {/* Confetti animation on success */}
+                                <div className="pointer-events-none fixed inset-0 z-50" aria-hidden>
+                                    <DotLottieReact
+                                        src="https://lottie.host/b28550e9-dcdb-4ee8-a17d-65fedf2c4864/nAQ6bL4EgY.lottie"
+                                        autoplay
+                                        loop={false}
+                                        style={{ width: '100%', height: '100%' }}
+                                    />
+                                </div>
 
+                                <div className="flex gap-3 mt-6 w-full max-w-[340px] justify-center">
                                     <button
                                         onClick={async () => {
                                             const element = document.getElementById('waitlist-card-export');
                                             if (!element) return;
                                             try {
                                                 const domtoimage = (await import('dom-to-image-more')).default;
-                                                const dataUrl = await domtoimage.toPng(element, { quality: 1, scale: 3 });
+                                                const dataUrl = await domtoimage.toPng(element, {
+                                                    quality: 1,
+                                                    scale: 4,
+                                                    bgcolor: '#FAFAFA',
+                                                    width: element.offsetWidth,
+                                                    height: element.offsetHeight,
+                                                    style: {
+                                                        transform: 'none',
+                                                        borderRadius: '6px',
+                                                        overflow: 'hidden',
+                                                    }
+                                                });
                                                 const link = document.createElement('a');
                                                 link.download = `latents-stamp-${userData.rank}.png`;
                                                 link.href = dataUrl;
@@ -475,10 +474,10 @@ export default function WaitlistSuccess() {
                                                 alert('Download failed. Please try again.');
                                             }
                                         }}
-                                        className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-white text-gray-900 border border-gray-200 hover:bg-gray-50 transition-colors shadow-sm"
+                                        className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-black transition-all shadow-lg"
                                     >
                                         <Download size={16} />
-                                        <span>Download</span>
+                                        <span>Download Stamp</span>
                                     </button>
                                 </div>
                             </div>
