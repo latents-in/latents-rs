@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
 import { Link } from "react-router-dom";
 import JoinWaitlistModal from "./JoinWaitlistModal";
+import latentsLogo from "../assets/latents.webp";
 
 export default function Navbar() {
     const [hidden, setHidden] = useState(false);
@@ -49,8 +50,12 @@ export default function Navbar() {
                 <div className="flex items-center justify-between px-2 md:px-2 py-2 glass-nav rounded-full shadow-sm pointer-events-auto w-full max-w-5xl bg-white/70 backdrop-blur-xl">
                     {/* Logo */}
                     <Link to="/" className="flex items-center pl-4 pr-6">
-                        <span className="font-display font-medium text-2xl tracking-tight text-[#000000e6] flex items-center gap-2">
-                            Latents
+                        <span className="font-display font-medium text-2xl tracking-tight flex items-center gap-2">
+                            <span className="font-bold leading-normal text-black">
+                                Latents
+                            </span>
+                            <img src={latentsLogo} alt="Latents Logo" className="w-7  object-cover" />
+
                         </span>
                     </Link>
 
