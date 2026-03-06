@@ -259,19 +259,6 @@ export default function WaitlistSuccess() {
     useEffect(() => {
         const handleAuth = async () => {
             try {
-                // With PKCE flow, Supabase redirects with ?code= in the URL.
-                // We must exchange the code for a session before calling getSession().
-                const urlParams = new URLSearchParams(window.location.search);
-                const code = urlParams.get('code');
-
-                if (code) {
-                    // Exchange the PKCE code for a session
-                    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
-                    if (exchangeError) throw exchangeError;
-                    // Clean the URL so the code isn't re-used on refresh
-                    window.history.replaceState({}, '', '/verify');
-                }
-
                 // 1. Check if we have a session (means magic link was successful)
                 const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
