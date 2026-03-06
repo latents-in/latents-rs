@@ -148,7 +148,7 @@ export default function LandingPage() {
                         onClick={() => setIsModalOpen(true)}
                         className="w-full px-8 py-4 bg-[#1d1d1f] hover:bg-black hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 rounded-full flex items-center justify-center text-white text-[16px] sm:text-[18px] font-bold tracking-wide shadow-lg border border-black/10"
                     >
-                        Join the Waitlist
+                        Get Early Access
                     </button>
 
                     {/* Tiny secure note */}
