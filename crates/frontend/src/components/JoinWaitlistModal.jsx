@@ -81,7 +81,7 @@ export default function JoinWaitlistModal({ isOpen, onClose, onSubmit, isLoading
 
                                     {/* Role Selector */}
                                     <div className="space-y-2">
-                                        <p className="text-[13px] font-semibold text-[#86868b] uppercase tracking-widest ml-1">Write your own destiny</p>
+                                        <p className="text-[13px] font-semibold text-[#86868b] uppercase tracking-widest ml-1">Choose your persona</p>
                                         <div className="grid grid-cols-2 gap-2">
                                             {ROLES.map((r) => (
                                                 <button
@@ -109,7 +109,7 @@ export default function JoinWaitlistModal({ isOpen, onClose, onSubmit, isLoading
                                                 >
                                                     <input
                                                         type="text"
-                                                        placeholder="Tell us what you do..."
+                                                        placeholder="Write your own destiny..."
                                                         value={customRole}
                                                         onChange={(e) => setCustomRole(e.target.value)}
                                                         className="w-full mt-2 px-4 py-3 rounded-xl focus:outline-none bg-gray-50 focus:bg-white text-[15px] text-[#1d1d1f] font-medium placeholder:text-[#86868b] placeholder:font-normal border border-transparent focus:border-gray-300 transition-colors shadow-sm"
