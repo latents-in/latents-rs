@@ -275,7 +275,7 @@ export default function LandingPage() {
                 transition={{ duration: 1.2, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
                 className="absolute bottom-[-5%] right-[-10%] md:bottom-0 md:right-0 z-20"
             >
-                <img src={ten} alt="Newspaper" className="w-[180px] md:w-[300px] lg:w-[400px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.15)] opacity-80 md:opacity-100" />
+                <img src={ten} alt="Newspaper" className="w-[180px] md:w-[300px] lg:w-[450px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.15)] opacity-80 md:opacity-100" />
             </motion.div>
 
             {/* Ground Breaker & Five Image */}
