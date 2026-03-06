@@ -197,7 +197,7 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
                                     LATENTS.IN
                                 </span>
                             </div>
-                            <img src={latentsImg} alt="Latents Logo" className="w-[45px] h-[45px] object-contain drop-shadow-md grayscale opacity-90" />
+                            <img src={latentsImg} alt="Latents Logo" className="w-[45px] h-[45px] object-contain drop-shadow-md" />
                         </div>
 
                         {/* Middle Typography */}
