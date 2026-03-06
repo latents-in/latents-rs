@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
 import { Check, Loader2, Command, Download } from 'lucide-react';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import latentsImg from '../assets/latents.webp';
 
 // --- Role-Specific SVGs & Themes ---
 const ShapeFounder = () => (
@@ -196,7 +197,7 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
                                     LATENTS.IN
                                 </span>
                             </div>
-                            <Command size={18} className="text-gray-800 drop-shadow-md" />
+                            <img src={latentsImg} alt="Latents Logo" className="w-[45px] h-[45px] object-contain drop-shadow-md grayscale opacity-90" />
                         </div>
 
                         {/* Middle Typography */}
