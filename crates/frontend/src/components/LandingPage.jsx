@@ -102,20 +102,161 @@ export default function LandingPage() {
 
     return (
         <div className="relative w-full min-h-screen bg-[#FDFDFD] overflow-hidden font-sans flex flex-col items-center justify-center">
+            {/* Background Content Wrapper - blurs when modal is open */}
+            <div className={cn(
+                "absolute inset-0 z-0 transition-all duration-700",
+                isModalOpen ? "blur-[12px] brightness-75 scale-[0.98]" : "blur-0 brightness-100 scale-100"
+            )}>
+                {/* ====== ACETERNITY DOT BACKGROUND ====== */}
+                <div
+                    className={cn(
+                        "absolute inset-0 z-0",
+                        "[background-size:20px_20px]",
+                        "[background-image:radial-gradient(#d4d4d4_1px,transparent_1px)]"
+                    )}
+                />
+                {/* Radial gradient mask for faded center look */}
+                <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center bg-white [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
 
-            {/* ====== ACETERNITY DOT BACKGROUND ====== */}
-            <div
-                className={cn(
-                    "absolute inset-0 z-0",
-                    "[background-size:20px_20px]",
-                    "[background-image:radial-gradient(#d4d4d4_1px,transparent_1px)]"
-                )}
-            />
-            {/* Radial gradient mask for faded center look */}
-            <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center bg-white [mask-image:radial-gradient(ellipse_at_center,transparent_20%,black)]" />
+                {/* Decorative Elements - blurs with wrapper */}
+                {/* Six Image */}
+                <motion.div
+                    initial={{ opacity: 0, x: 80, y: -20, rotate: -15 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: 5 }}
+                    transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute top-[3%] right-[-5%] md:top-[6%] md:left-[55%] md:right-auto z-0 md:z-20"
+                >
+                    <img src={six} alt="six" className="w-[140px] md:w-[280px] lg:w-[320px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
+                </motion.div>
 
-            {/* Central Content — always visible, centered */}
-            <div className="relative z-10 flex flex-col items-center text-center w-full max-w-4xl mx-auto px-6">
+                {/* Twitter & Seven Image */}
+                <motion.div
+                    initial={{ opacity: 0, x: 100, y: 0, rotate: 15 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: -14 }}
+                    transition={{ duration: 1, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute top-[18%] right-[-10%] md:top-[22%] md:left-[77%] md:right-auto z-0 md:z-20"
+                >
+                    <img src={seven} alt="Twitter" className="w-[130px] md:w-[260px] lg:w-[300px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
+                </motion.div>
+
+                {/* Email & Eight Image */}
+                <motion.div
+                    initial={{ opacity: 0, x: 120, y: 20, rotate: -10 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: 10 }}
+                    transition={{ duration: 1, delay: 1.0, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute top-[40%] right-[-5%] md:top-[47%] md:left-[75%] md:right-auto z-0 md:z-20"
+                >
+                    <img src={eight} alt="Email" className="w-[110px] md:w-[220px] lg:w-[250px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-40 md:opacity-100" />
+                </motion.div>
+
+                {/* Opportunity & Nine Image */}
+                <motion.div
+                    initial={{ opacity: 0, x: 90, y: 40, rotate: 20 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: 8 }}
+                    transition={{ duration: 1, delay: 1.3, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute top-[60%] right-[5%] md:top-[62%] md:left-[65%] md:right-auto z-0 md:z-20"
+                >
+                    <img src={nine} alt="Opportunity" className="w-[120px] md:w-[220px] lg:w-[250px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
+                </motion.div>
+
+                {/* Tilted Marquee */}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 1.2, delay: 0.8 }}
+                    className="absolute top-[75%] md:top-[74%] right-[-20%] md:right-[-10%] w-[180%] overflow-hidden z-10 -rotate-[10deg] origin-bottom-right pointer-events-none"
+                >
+                    <div className="flex gap-0 overflow-hidden py-1">
+                        <div className="flex gap-6 animate-marquee whitespace-nowrap shrink-0 px-4">
+                            {['Series A Announced', 'Hidden Opportunities', 'Find Accelerators', 'Ground Breakers', 'YC W26', 'Latents', 'Deal Flow', 'Missed Chances', 'OpenAI $40B', 'Investor Outreach', 'Stealth Mode', 'Term Sheet', 'Venture Capital', 'Seed Round'].map((t, i) => {
+                                const colors = ['bg-red-500', 'bg-yellow-500', 'bg-green-500'];
+                                const dotColor = colors[i % colors.length];
+                                return (
+                                    <span key={i} className="inline-flex items-center gap-1.5 md:gap-2 bg-[#F0F0F0] text-[#B0B0B0] text-[11px] md:text-[13px] font-semibold tracking-widest uppercase px-3 md:px-5 py-1.5 md:py-2 rounded-full border border-[#E0E0E0]">
+                                        <span className={`w-1 md:w-1.5 h-1 md:h-1.5 rounded-full ${dotColor} inline-block shrink-0`} />
+                                        {t}
+                                    </span>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </motion.div>
+
+                {/* Ten / Newspaper Image */}
+                <motion.div
+                    initial={{ opacity: 0, x: 150, y: 80, rotate: 10 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
+                    transition={{ duration: 1.2, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute bottom-[-5%] right-[-10%] md:bottom-0 md:right-0 z-20"
+                >
+                    <img src={ten} alt="Newspaper" className="w-[180px] md:w-[300px] lg:w-[450px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.15)] opacity-80 md:opacity-100" />
+                </motion.div>
+
+                {/* Other assets... (compressed for brevity in replacement) */}
+                <motion.div
+                    initial={{ opacity: 0, x: -80, y: -20, rotate: -25 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: -3 }}
+                    transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute top-[5%] left-[-5%] md:top-[8%] md:left-[20%] z-0 md:z-10"
+                >
+                    <img src={five} alt="Ground Breaker" className="w-[120px] md:w-[200px] lg:w-[240px] drop-shadow-[0px_10px_10px_rgba(139,32,21,0.8)] opacity-60 md:opacity-100" />
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, x: -100, y: 0, rotate: 25 }}
+                    animate={{ opacity: 1, x: 0, y: 0, rotate: 10 }}
+                    transition={{ duration: 1, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute top-[20%] left-[-2%] md:top-[25%] md:left-[3%] z-0 md:z-20"
+                >
+                    <img src={one} alt="SeriesA" className="w-[130px] md:w-[230px] lg:w-[270px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, x: -120, y: 20, rotate: -20 }}
+                    animate={{ opacity: 1, x: 0, y: 50, rotate: -6 }}
+                    transition={{ duration: 1, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute top-[40%] left-[-8%] md:top-[48%] md:left-[6%] z-0 md:z-20"
+                >
+                    <img src={four} alt="findAccelerators" className="w-[120px] md:w-[210px] lg:w-[255px] drop-shadow-[0px_25px_20px_rgba(0,0,0,0.4)] opacity-40 md:opacity-100" />
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, x: -90, y: 60, rotate: 15 }}
+                    animate={{ opacity: 1, x: 0, y: 20, rotate: 7 }}
+                    transition={{ duration: 1, delay: 1.1, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute top-[65%] left-[0%] md:top-[65%] md:left-[25%] z-0 md:z-20"
+                >
+                    <img src={three} alt="ShowMe" className="w-[150px] md:w-[300px] lg:w-[380px] drop-shadow-[0px_25px_20px_rgba(0,0,0,0.3)] opacity-60 md:opacity-100" />
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, x: -150, y: 280, rotate: -15 }}
+                    animate={{ opacity: 1, x: 0, y: 150, rotate: 30 }}
+                    transition={{ duration: 1.2, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute bottom-5 left-[-5%] md:left-10 z-20"
+                >
+                    <img src={dollarImg} alt="Dollar" className="w-[140px] md:w-[260px] lg:w-[340px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.12)] opacity-80 md:opacity-100" />
+                </motion.div>
+
+                <motion.div
+                    initial={{ opacity: 0, x: 100, y: 100 }}
+                    animate={{ opacity: 1, x: 0, y: 0 }}
+                    transition={{ duration: 1.2, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
+                    className="absolute md:bottom-[0%] right-[-5%] bottom-[-2%] md:left-[8%] md:right-auto w-32 md:w-48 lg:w-64 z-20 pointer-events-none"
+                >
+                    <DotLottieReact
+                        src="https://lottie.host/7a69ede1-1eca-49b8-82f7-17a0e04f68b4/aVFlcIgc4F.lottie"
+                        loop
+                        autoplay
+                    />
+                </motion.div>
+            </div>
+
+            {/* Central Content — also blurs but stays separately handled from modal */}
+            <div className={cn(
+                "relative z-10 flex flex-col items-center text-center w-full max-w-4xl mx-auto px-6 transition-all duration-700",
+                isModalOpen ? "blur-[8px] scale-[0.98] brightness-75" : "blur-0 scale-100 brightness-100"
+            )}>
                 <motion.h1
                     initial={{ opacity: 0, scale: 0.95, y: 10 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -126,7 +267,6 @@ export default function LandingPage() {
                     One Place.
                 </motion.h1>
 
-                {/* Tagline */}
                 <motion.p
                     initial={{ opacity: 0, y: 8 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -137,7 +277,6 @@ export default function LandingPage() {
                     <span className="text-[#1d1d1f] font-semibold">Start Acting.</span>
                 </motion.p>
 
-                {/* Join Waitlist Button */}
                 <motion.div
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -151,7 +290,6 @@ export default function LandingPage() {
                         Get Early Access
                     </button>
 
-                    {/* Tiny secure note */}
                     <p className="text-[12px] text-gray-400 mt-4 font-medium flex items-center justify-center gap-1.5">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
@@ -160,22 +298,13 @@ export default function LandingPage() {
                     </p>
                 </motion.div>
 
-                <JoinWaitlistModal
-                    isOpen={isModalOpen}
-                    onClose={() => setIsModalOpen(false)}
-                    onSubmit={handleJoinSubmit}
-                    isLoading={isLoading}
-                    browserLocation={browserLocation}
-                />
-
-                {/* Status Message */}
                 <AnimatePresence>
                     {status && (
                         <motion.div
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className={`mt-6 text-[15px] font-medium tracking-tight px-6 py-3 rounded-full border backdrop-blur-md shadow-sm ${status === 'magic_link_sent'
+                            className={`mt-6 text-[15px] font-medium tracking-tight px-6 py-3 rounded-full border backdrop-blur shadow-sm ${status === 'magic_link_sent'
                                 ? 'bg-green-50/90 text-green-800 border-green-200'
                                 : 'bg-red-50/90 text-red-800 border-red-200'
                                 }`}
@@ -188,160 +317,15 @@ export default function LandingPage() {
                 </AnimatePresence>
             </div>
 
-
-            {/* ============================================================ */}
-            {/* DECORATIVE PNGs — responsive positioning and sizing            */}
-            {/* ============================================================ */}
-
-            {/* Six Image - Centre-Right Top */}
-            <motion.div
-                initial={{ opacity: 0, x: 80, y: -20, rotate: -15 }}
-                animate={{ opacity: 1, x: 0, y: 0, rotate: 5 }}
-                transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-[3%] right-[-5%] md:top-[6%] md:left-[55%] md:right-auto z-0 md:z-20"
-            >
-                <img src={six} alt="six" className="w-[140px] md:w-[280px] lg:w-[320px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
-            </motion.div>
-
-            {/* Twitter & Seven Image */}
-            <motion.div
-                initial={{ opacity: 0, x: 100, y: 0, rotate: 15 }}
-                animate={{ opacity: 1, x: 0, y: 0, rotate: -14 }}
-                transition={{ duration: 1, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-[18%] right-[-10%] md:top-[22%] md:left-[77%] md:right-auto z-0 md:z-20"
-            >
-                <img src={seven} alt="Twitter" className="w-[130px] md:w-[260px] lg:w-[300px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
-            </motion.div>
-
-            {/* Email & Eight Image */}
-            <motion.div
-                initial={{ opacity: 0, x: 120, y: 20, rotate: -10 }}
-                animate={{ opacity: 1, x: 0, y: 0, rotate: 10 }}
-                transition={{ duration: 1, delay: 1.0, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-[40%] right-[-5%] md:top-[47%] md:left-[75%] md:right-auto z-0 md:z-20"
-            >
-                <img src={eight} alt="Email" className="w-[110px] md:w-[220px] lg:w-[250px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-40 md:opacity-100" />
-            </motion.div>
-
-            {/* Opportunity & Nine Image */}
-            <motion.div
-                initial={{ opacity: 0, x: 90, y: 40, rotate: 20 }}
-                animate={{ opacity: 1, x: 0, y: 0, rotate: 8 }}
-                transition={{ duration: 1, delay: 1.3, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-[60%] right-[5%] md:top-[62%] md:left-[65%] md:right-auto z-0 md:z-20"
-            >
-                <img src={nine} alt="Opportunity" className="w-[120px] md:w-[220px] lg:w-[250px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
-            </motion.div>
-
-            {/* ===== TILTED MARQUEE STRIP ===== */}
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 1.2, delay: 0.8 }}
-                className="absolute top-[75%] md:top-[74%] right-[-20%] md:right-[-10%] w-[180%] overflow-hidden z-10 -rotate-[10deg] origin-bottom-right pointer-events-none"
-            >
-                <div className="flex gap-0 overflow-hidden py-1">
-                    <div className="flex gap-6 animate-marquee whitespace-nowrap shrink-0 px-4">
-                        {['Series A Announced', 'Hidden Opportunities', 'Find Accelerators', 'Ground Breakers', 'YC W26', 'Latents', 'Deal Flow', 'Missed Chances', 'OpenAI $40B', 'Investor Outreach', 'Stealth Mode', 'Term Sheet', 'Venture Capital', 'Seed Round'].map((t, i) => {
-                            const colors = ['bg-red-500', 'bg-yellow-500', 'bg-green-500'];
-                            const dotColor = colors[i % colors.length];
-                            return (
-                                <span key={i} className="inline-flex items-center gap-1.5 md:gap-2 bg-[#F0F0F0] text-[#B0B0B0] text-[11px] md:text-[13px] font-semibold tracking-widest uppercase px-3 md:px-5 py-1.5 md:py-2 rounded-full border border-[#E0E0E0]">
-                                    <span className={`w-1 md:w-1.5 h-1 md:h-1.5 rounded-full ${dotColor} inline-block shrink-0`} />
-                                    {t}
-                                </span>
-                            );
-                        })}
-                    </div>
-                    <div aria-hidden className="flex gap-6 animate-marquee whitespace-nowrap shrink-0 px-4">
-                        {['Series A Announced', 'Hidden Opportunities', 'Find Accelerators', 'Ground Breakers', 'YC W26', 'Latents', 'Deal Flow', 'Missed Chances', 'OpenAI $40B', 'Investor Outreach', 'Stealth Mode', 'Term Sheet', 'Venture Capital', 'Seed Round'].map((t, i) => {
-                            const colors = ['bg-red-500', 'bg-yellow-500', 'bg-green-500'];
-                            const dotColor = colors[i % colors.length];
-                            return (
-                                <span key={i} className="inline-flex items-center gap-1.5 md:gap-2 bg-[#F0F0F0] text-[#B0B0B0] text-[11px] md:text-[13px] font-semibold tracking-widest uppercase px-3 md:px-5 py-1.5 md:py-2 rounded-full border border-[#E0E0E0]">
-                                    <span className={`w-1 md:w-1.5 h-1 md:h-1.5 rounded-full ${dotColor} inline-block shrink-0`} />
-                                    {t}
-                                </span>
-                            );
-                        })}
-                    </div>
-                </div>
-            </motion.div>
-
-            {/* Ten / Newspaper Image - Bottom Right */}
-            <motion.div
-                initial={{ opacity: 0, x: 150, y: 80, rotate: 10 }}
-                animate={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
-                transition={{ duration: 1.2, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute bottom-[-5%] right-[-10%] md:bottom-0 md:right-0 z-20"
-            >
-                <img src={ten} alt="Newspaper" className="w-[180px] md:w-[300px] lg:w-[450px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.15)] opacity-80 md:opacity-100" />
-            </motion.div>
-
-            {/* Ground Breaker & Five Image */}
-            <motion.div
-                initial={{ opacity: 0, x: -80, y: -20, rotate: -25 }}
-                animate={{ opacity: 1, x: 0, y: 0, rotate: -3 }}
-                transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-[5%] left-[-5%] md:top-[8%] md:left-[20%] z-0 md:z-10"
-            >
-                <img src={five} alt="Ground Breaker" className="w-[120px] md:w-[200px] lg:w-[240px] drop-shadow-[0px_10px_10px_rgba(139,32,21,0.8)] opacity-60 md:opacity-100" />
-            </motion.div>
-
-            {/* SeriesA Image */}
-            <motion.div
-                initial={{ opacity: 0, x: -100, y: 0, rotate: 25 }}
-                animate={{ opacity: 1, x: 0, y: 0, rotate: 10 }}
-                transition={{ duration: 1, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-[20%] left-[-2%] md:top-[25%] md:left-[3%] z-0 md:z-20"
-            >
-                <img src={one} alt="SeriesA" className="w-[130px] md:w-[230px] lg:w-[270px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
-            </motion.div>
-
-            {/* Find Accelerators Image */}
-            <motion.div
-                initial={{ opacity: 0, x: -120, y: 20, rotate: -20 }}
-                animate={{ opacity: 1, x: 0, y: 50, rotate: -6 }}
-                transition={{ duration: 1, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-[40%] left-[-8%] md:top-[48%] md:left-[6%] z-0 md:z-20"
-            >
-                <img src={four} alt="findAccelerators" className="w-[120px] md:w-[210px] lg:w-[255px] drop-shadow-[0px_25px_20px_rgba(0,0,0,0.4)] opacity-40 md:opacity-100" />
-            </motion.div>
-
-            {/* Show Me & Three Image */}
-            <motion.div
-                initial={{ opacity: 0, x: -90, y: 60, rotate: 15 }}
-                animate={{ opacity: 1, x: 0, y: 20, rotate: 7 }}
-                transition={{ duration: 1, delay: 1.1, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute top-[65%] left-[0%] md:top-[65%] md:left-[25%] z-0 md:z-20"
-            >
-                <img src={three} alt="ShowMe" className="w-[150px] md:w-[300px] lg:w-[380px] drop-shadow-[0px_25px_20px_rgba(0,0,0,0.3)] opacity-60 md:opacity-100" />
-            </motion.div>
-
-            {/* Dollar Image - Bottom Left */}
-            <motion.div
-                initial={{ opacity: 0, x: -150, y: 280, rotate: -15 }}
-                animate={{ opacity: 1, x: 0, y: 150, rotate: 30 }}
-                transition={{ duration: 1.2, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute bottom-5 left-[-5%] md:left-10 z-20"
-            >
-                <img src={dollarImg} alt="Dollar" className="w-[140px] md:w-[260px] lg:w-[340px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.12)] opacity-80 md:opacity-100" />
-            </motion.div>
-
-            {/* Lottie Animation */}
-            <motion.div
-                initial={{ opacity: 0, x: 100, y: 100 }}
-                animate={{ opacity: 1, x: 0, y: 0 }}
-                transition={{ duration: 1.2, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                className="absolute md:bottom-[0%] right-[-5%] bottom-[-2%] md:left-[8%] md:right-auto w-32 md:w-48 lg:w-64 z-20 pointer-events-none"
-            >
-                <DotLottieReact
-                    src="https://lottie.host/7a69ede1-1eca-49b8-82f7-17a0e04f68b4/aVFlcIgc4F.lottie"
-                    loop
-                    autoplay
-                />
-            </motion.div>
-
+            {/* Modal - rendered outside the blurred containers */}
+            <JoinWaitlistModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSubmit={handleJoinSubmit}
+                isLoading={isLoading}
+                browserLocation={browserLocation}
+            />
         </div>
     );
 }
+
