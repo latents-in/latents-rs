@@ -53,7 +53,7 @@ export default function JoinWaitlistModal({ isOpen, onClose, onSubmit, isLoading
                                     Secure Your Spot
                                 </h2>
                                 <p className="text-[#86868b] text-[15px] mb-6">
-                                    Enter your details to join the waitlist and get early access.
+                                    Enter your details to get a FREE MONTH of access and a Limited Edition Card.
                                 </p>
 
                                 <form onSubmit={handleSubmit} className="space-y-4">
