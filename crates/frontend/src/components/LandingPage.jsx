@@ -15,12 +15,39 @@ import eight from '../assets/8.webp';
 import nine from '../assets/9.webp';
 import ten from '../assets/10.webp';
 import dollarImg from '../assets/dollar.webp';
+import loaderVideo from '../assets/loader.webm';
 
 export default function LandingPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [status, setStatus] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [browserLocation, setBrowserLocation] = useState(null);
+    const [imagesLoaded, setImagesLoaded] = useState(false);
+
+    // Preload images
+    useEffect(() => {
+        const imageUrls = [one, three, four, five, six, seven, eight, nine, ten, dollarImg];
+
+        let loadedCount = 0;
+
+        imageUrls.forEach(url => {
+            const img = new Image();
+            img.onload = () => {
+                loadedCount++;
+                if (loadedCount === imageUrls.length) {
+                    setImagesLoaded(true);
+                }
+            };
+            // In case an image fails to load, we still want to proceed eventually
+            img.onerror = () => {
+                loadedCount++;
+                if (loadedCount === imageUrls.length) {
+                    setImagesLoaded(true);
+                }
+            };
+            img.src = url;
+        });
+    }, []);
 
     // Try to get browser geolocation on component mount
     useEffect(() => {
@@ -100,6 +127,21 @@ export default function LandingPage() {
         }
     };
 
+    if (!imagesLoaded) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-white">
+                <video
+                    src={loaderVideo}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    className="w-24 h-24 md:w-32 md:h-32 object-contain"
+                />
+            </div>
+        );
+    }
+
     return (
         <div className="relative w-full min-h-screen bg-[#FDFDFD] overflow-hidden font-sans flex flex-col items-center justify-center">
             {/* Background Content Wrapper - blurs when modal is open */}
@@ -124,9 +166,9 @@ export default function LandingPage() {
                     initial={{ opacity: 0, x: 80, y: -20, rotate: -15 }}
                     animate={{ opacity: 1, x: 0, y: 0, rotate: 5 }}
                     transition={{ duration: 1, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-[3%] right-[-5%] md:top-[6%] md:left-[55%] md:right-auto z-0 md:z-20"
+                    className="absolute top-[10%] right-[0%] md:top-[6%] md:left-[55%] md:right-auto z-10 md:z-20"
                 >
-                    <img src={six} alt="six" className="w-[140px] md:w-[280px] lg:w-[320px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
+                    <img src={six} alt="six" className="w-[140px] md:w-[280px] lg:w-[320px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)]" />
                 </motion.div>
 
                 {/* Twitter & Seven Image */}
@@ -134,9 +176,9 @@ export default function LandingPage() {
                     initial={{ opacity: 0, x: 100, y: 0, rotate: 15 }}
                     animate={{ opacity: 1, x: 0, y: 0, rotate: -14 }}
                     transition={{ duration: 1, delay: 0.7, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-[18%] right-[-10%] md:top-[22%] md:left-[77%] md:right-auto z-0 md:z-20"
+                    className="absolute top-[22%] right-[-5%] md:top-[22%] md:left-[77%] md:right-auto z-10 md:z-20"
                 >
-                    <img src={seven} alt="Twitter" className="w-[130px] md:w-[260px] lg:w-[300px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
+                    <img src={seven} alt="Twitter" className="w-[160px] md:w-[260px] lg:w-[300px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)]" />
                 </motion.div>
 
                 {/* Email & Eight Image */}
@@ -144,9 +186,9 @@ export default function LandingPage() {
                     initial={{ opacity: 0, x: 120, y: 20, rotate: -10 }}
                     animate={{ opacity: 1, x: 0, y: 0, rotate: 10 }}
                     transition={{ duration: 1, delay: 1.0, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-[40%] right-[-5%] md:top-[47%] md:left-[75%] md:right-auto z-0 md:z-20"
+                    className="absolute top-[40%] right-[-5%] md:top-[47%] md:left-[75%] md:right-auto z-10 md:z-20"
                 >
-                    <img src={eight} alt="Email" className="w-[110px] md:w-[220px] lg:w-[250px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-40 md:opacity-100" />
+                    <img src={eight} alt="Email" className="w-[110px] md:w-[220px] lg:w-[250px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)]" />
                 </motion.div>
 
                 {/* Opportunity & Nine Image */}
@@ -154,9 +196,9 @@ export default function LandingPage() {
                     initial={{ opacity: 0, x: 90, y: 40, rotate: 20 }}
                     animate={{ opacity: 1, x: 0, y: 0, rotate: 8 }}
                     transition={{ duration: 1, delay: 1.3, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-[60%] right-[5%] md:top-[62%] md:left-[65%] md:right-auto z-0 md:z-20"
+                    className="absolute top-[60%] right-[5%] md:top-[62%] md:left-[65%] md:right-auto z-10 md:z-20"
                 >
-                    <img src={nine} alt="Opportunity" className="w-[120px] md:w-[220px] lg:w-[250px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
+                    <img src={nine} alt="Opportunity" className="w-[120px] md:w-[220px] lg:w-[250px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)]" />
                 </motion.div>
 
                 {/* Tilted Marquee */}
@@ -187,9 +229,9 @@ export default function LandingPage() {
                     initial={{ opacity: 0, x: 150, y: 80, rotate: 10 }}
                     animate={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
                     transition={{ duration: 1.2, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute bottom-[-5%] right-[-10%] md:bottom-0 md:right-0 z-20"
+                    className="absolute bottom-0 right-0 z-20"
                 >
-                    <img src={ten} alt="Newspaper" className="w-[180px] md:w-[300px] lg:w-[450px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.15)] opacity-80 md:opacity-100" />
+                    <img src={ten} alt="Newspaper" className="w-[320px] md:w-[300px] lg:w-[450px] drop-shadow-[-20px_40px_50px_rgba(156,163,175,1)]" />
                 </motion.div>
 
                 {/* Other assets... (compressed for brevity in replacement) */}
@@ -197,36 +239,36 @@ export default function LandingPage() {
                     initial={{ opacity: 0, x: -80, y: -20, rotate: -25 }}
                     animate={{ opacity: 1, x: 0, y: 0, rotate: -3 }}
                     transition={{ duration: 1, delay: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-[5%] left-[-5%] md:top-[8%] md:left-[20%] z-0 md:z-10"
+                    className="absolute top-[10%] left-[2%] md:top-[8%] md:left-[20%] z-10"
                 >
-                    <img src={five} alt="Ground Breaker" className="w-[120px] md:w-[200px] lg:w-[240px] drop-shadow-[0px_10px_10px_rgba(139,32,21,0.8)] opacity-60 md:opacity-100" />
+                    <img src={five} alt="Ground Breaker" className="w-[120px] md:w-[200px] lg:w-[240px] drop-shadow-[0px_10px_10px_rgba(139,32,21,0.8)]" />
                 </motion.div>
 
                 <motion.div
                     initial={{ opacity: 0, x: -100, y: 0, rotate: 25 }}
                     animate={{ opacity: 1, x: 0, y: 0, rotate: 10 }}
                     transition={{ duration: 1, delay: 0.5, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-[20%] left-[-2%] md:top-[25%] md:left-[3%] z-0 md:z-20"
+                    className="absolute top-[20%] left-[-2%] md:top-[25%] md:left-[3%] z-10 md:z-20"
                 >
-                    <img src={one} alt="SeriesA" className="w-[130px] md:w-[230px] lg:w-[270px] drop-shadow-[0px_25px_40px_rgba(0,0,0,0.15)] opacity-50 md:opacity-100" />
+                    <img src={one} alt="SeriesA" className="w-[130px] md:w-[230px] lg:w-[270px] drop-shadow-[0px_25px_30px_rgba(156,163,175,0.8)]" />
                 </motion.div>
 
                 <motion.div
                     initial={{ opacity: 0, x: -120, y: 20, rotate: -20 }}
                     animate={{ opacity: 1, x: 0, y: 50, rotate: -6 }}
                     transition={{ duration: 1, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-[40%] left-[-8%] md:top-[48%] md:left-[6%] z-0 md:z-20"
+                    className="absolute top-[40%] left-[-8%] md:top-[48%] md:left-[6%] z-10 md:z-20"
                 >
-                    <img src={four} alt="findAccelerators" className="w-[120px] md:w-[210px] lg:w-[255px] drop-shadow-[0px_25px_20px_rgba(0,0,0,0.4)] opacity-40 md:opacity-100" />
+                    <img src={four} alt="findAccelerators" className="w-[120px] md:w-[210px] lg:w-[255px] drop-shadow-[0px_25px_20px_rgba(0,0,0,0.4)]" />
                 </motion.div>
 
                 <motion.div
                     initial={{ opacity: 0, x: -90, y: 60, rotate: 15 }}
                     animate={{ opacity: 1, x: 0, y: 20, rotate: 7 }}
                     transition={{ duration: 1, delay: 1.1, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute top-[65%] left-[0%] md:top-[65%] md:left-[25%] z-0 md:z-20"
+                    className="absolute top-[65%] left-[0%] md:top-[65%] md:left-[25%] z-10 md:z-20"
                 >
-                    <img src={three} alt="ShowMe" className="w-[150px] md:w-[300px] lg:w-[380px] drop-shadow-[0px_25px_20px_rgba(0,0,0,0.3)] opacity-60 md:opacity-100" />
+                    <img src={three} alt="ShowMe" className="w-[250px] md:w-[300px] lg:w-[380px] drop-shadow-[0px_25px_20px_rgba(0,0,0,0.3)]" />
                 </motion.div>
 
                 <motion.div
@@ -235,14 +277,14 @@ export default function LandingPage() {
                     transition={{ duration: 1.2, delay: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     className="absolute bottom-5 left-[-5%] md:left-10 z-20"
                 >
-                    <img src={dollarImg} alt="Dollar" className="w-[140px] md:w-[260px] lg:w-[340px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.12)] opacity-80 md:opacity-100" />
+                    <img src={dollarImg} alt="Dollar" className="w-[140px] md:w-[260px] lg:w-[340px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.12)]" />
                 </motion.div>
 
                 <motion.div
                     initial={{ opacity: 0, x: 100, y: 100 }}
                     animate={{ opacity: 1, x: 0, y: 0 }}
                     transition={{ duration: 1.2, delay: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute md:bottom-[0%] right-[-5%] bottom-[-2%] md:left-[8%] md:right-auto w-32 md:w-48 lg:w-64 z-20 pointer-events-none"
+                    className="absolute bottom-[0%] left-[1%] md:bottom-[0%] md:left-[8%] md:right-auto w-40 md:w-48 lg:w-64 z-20 pointer-events-none"
                 >
                     <DotLottieReact
                         src="https://lottie.host/7a69ede1-1eca-49b8-82f7-17a0e04f68b4/aVFlcIgc4F.lottie"
