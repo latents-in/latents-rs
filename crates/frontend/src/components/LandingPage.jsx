@@ -255,7 +255,7 @@ export default function LandingPage() {
                             initial={{ opacity: 0, x: -150, y: 280, rotate: -15 }}
                             animate={{ opacity: 1, x: 0, y: 150, rotate: 30 }}
                             transition={{ duration: 1.2, delay: 2.5, ease: [0.16, 1, 0.3, 1] }}
-                            className="absolute bottom-5 left-[-5%] md:left-10 z-20"
+                            className="absolute bottom-25 left-[-5%] md:bottom-10 md:left-[10] z-20"
                         >
                             <img src={dollarImg} alt="Dollar" className="w-[140px] md:w-[260px] lg:w-[340px] drop-shadow-[0px_-20px_40px_rgba(0,0,0,0.12)]" />
                         </motion.div>
