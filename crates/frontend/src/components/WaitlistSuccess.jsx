@@ -452,18 +452,12 @@ export default function WaitlistSuccess() {
                                             const element = document.getElementById('waitlist-card-export');
                                             if (!element) return;
                                             try {
-                                                const domtoimage = (await import('dom-to-image-more')).default;
-                                                const dataUrl = await domtoimage.toPng(element, {
+                                                const htmlToImage = await import('html-to-image');
+                                                const dataUrl = await htmlToImage.toPng(element, {
                                                     quality: 1,
-                                                    scale: 4,
-                                                    width: element.offsetWidth,
-                                                    height: element.offsetHeight,
+                                                    pixelRatio: 4,
                                                     style: {
                                                         transform: 'none',
-                                                        borderRadius: '6px',
-                                                        overflow: 'hidden',
-                                                        // Explicitly remove any 3D rotation applied by hover state during screenshot
-                                                        perspective: 'none',
                                                         margin: '0',
                                                     }
                                                 });
