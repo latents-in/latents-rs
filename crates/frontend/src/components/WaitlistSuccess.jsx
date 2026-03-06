@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { cn } from '../lib/utils';
-import { Check, Loader2, Download } from 'lucide-react';
+import { Check, Loader2, Command, Download } from 'lucide-react';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 // --- Role-Specific SVGs & Themes ---
