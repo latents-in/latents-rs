@@ -88,9 +88,9 @@ pre-deploy-backup:
 
 ## Health check
 health-check:
-	@echo "Checking health at localhost:8080/api/health..."
+	@echo "Checking health at localhost:5000/api/health..."
 	@sleep 2
-	@curl -s http://localhost:8080/api/health || (echo "Health check failed"; exit 1)
+	@curl -s http://localhost:5000/api/health || (echo "Health check failed"; exit 1)
 
 ## Deploy to production server
 deploy: build pre-deploy-backup
@@ -129,7 +129,7 @@ rollback:
 
 ## Run database migrations
 migrate:
-	cargo sqlx migrate run --source crates/server/migrations
+	@. ./.env && cargo sqlx migrate run --source crates/server/migrations --database-url "$$DIRECT_URL"
 
 ## Create a new migration
 migrate-new:
@@ -138,7 +138,7 @@ migrate-new:
 
 ## Revert last migration
 migrate-revert:
-	cargo sqlx migrate revert --source crates/server/migrations
+	@. ./.env && cargo sqlx migrate revert --source crates/server/migrations --database-url "$$DIRECT_URL"
 
 # =============================================================================
 # Testing & Quality

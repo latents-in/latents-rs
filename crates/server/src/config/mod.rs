@@ -4,7 +4,6 @@ use std::env;
 #[derive(Debug, Clone)]
 pub struct Config {
     pub database_url: String,
-    pub supabase_jwt_secret: String,
     pub port: u16,
     pub environment: Environment,
 }
@@ -22,9 +21,6 @@ impl Config {
         let database_url = env::var("DATABASE_URL")
             .expect("DATABASE_URL must be set in environment");
 
-        let supabase_jwt_secret = env::var("SUPABASE_JWT_SECRET")
-            .expect("SUPABASE_JWT_SECRET must be set in environment");
-
         let port = env::var("PORT")
             .ok()
             .and_then(|p| p.parse().ok())
@@ -40,7 +36,6 @@ impl Config {
 
         Ok(Self {
             database_url,
-            supabase_jwt_secret,
             port,
             environment,
         })
