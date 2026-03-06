@@ -167,7 +167,7 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
                 />
 
                 {/* Inner Card (Solid, protects text from mask) */}
-                <div id="waitlist-card-export" className="absolute inset-[10px] overflow-hidden rounded-md bg-[#FAFAFA] shadow-[inset_0_0_20px_rgba(0,0,0,0.03)]">
+                <div className="absolute inset-[10px] overflow-hidden rounded-md bg-[#FAFAFA] shadow-[inset_0_0_20px_rgba(0,0,0,0.03)]">
 
                     {/* Colorful Role Shape Background */}
                     <ShapeComponent />
@@ -456,13 +456,15 @@ export default function WaitlistSuccess() {
                                                 const dataUrl = await domtoimage.toPng(element, {
                                                     quality: 1,
                                                     scale: 4,
-                                                    bgcolor: '#FAFAFA',
                                                     width: element.offsetWidth,
                                                     height: element.offsetHeight,
                                                     style: {
                                                         transform: 'none',
                                                         borderRadius: '6px',
                                                         overflow: 'hidden',
+                                                        // Explicitly remove any 3D rotation applied by hover state during screenshot
+                                                        perspective: 'none',
+                                                        margin: '0',
                                                     }
                                                 });
                                                 const link = document.createElement('a');
