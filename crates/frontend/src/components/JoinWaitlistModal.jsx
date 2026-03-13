@@ -2,7 +2,12 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
-const ROLES = ['Founder', 'Student', 'Artist', 'Others'];
+const ROLES = [
+    { label: 'Founder', gradient: 'linear-gradient(135deg, #60A5FA, #3730A3)', accent: '#3730A3', bgIdle: 'rgba(96,165,250,0.10)' },
+    { label: 'Student', gradient: 'linear-gradient(135deg, #FDE047, #EA580C)', accent: '#EA580C', bgIdle: 'rgba(253,224,71,0.15)' },
+    { label: 'Artist', gradient: 'linear-gradient(135deg, #F472B6, #9D174D)', accent: '#BE185D', bgIdle: 'rgba(244,114,182,0.12)' },
+    { label: 'Others', gradient: 'linear-gradient(135deg, #2DD4BF, #C084FC, #F43F5E)', accent: '#9333EA', bgIdle: 'rgba(192,132,252,0.12)' },
+];
 
 export default function JoinWaitlistModal({ isOpen, onClose, onSubmit, isLoading, browserLocation }) {
     const [name, setName] = useState('');
@@ -53,7 +58,7 @@ export default function JoinWaitlistModal({ isOpen, onClose, onSubmit, isLoading
                                     Secure Your Spot
                                 </h2>
                                 <p className="text-[#86868b] text-[15px] mb-6">
-                                    Enter your details to get a FREE MONTH of access and a Limited Edition Card.
+                                    Enter your details to get a FREE MONTH of access and a Limited Edition Ticket.
                                 </p>
 
                                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -85,15 +90,19 @@ export default function JoinWaitlistModal({ isOpen, onClose, onSubmit, isLoading
                                         <div className="grid grid-cols-2 gap-2">
                                             {ROLES.map((r) => (
                                                 <button
-                                                    key={r}
+                                                    key={r.label}
                                                     type="button"
-                                                    onClick={() => { setRole(r); if (r !== 'Others') setCustomRole(''); }}
-                                                    className={`px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border ${role === r
-                                                        ? 'bg-[#1d1d1f] text-white border-[#1d1d1f]'
+                                                    onClick={() => { setRole(r.label); if (r.label !== 'Others') setCustomRole(''); }}
+                                                    style={role === r.label
+                                                        ? { background: r.gradient, border: 'none' }
+                                                        : {}
+                                                    }
+                                                    className={`px-3 py-2.5 rounded-xl text-sm font-semibold transition-all border ${role === r.label
+                                                        ? 'text-white shadow-md scale-[1.03]'
                                                         : 'bg-gray-50 text-[#86868b] border-transparent hover:border-gray-200 hover:bg-gray-100'
                                                         }`}
                                                 >
-                                                    {r}
+                                                    {r.label}
                                                 </button>
                                             ))}
                                         </div>
