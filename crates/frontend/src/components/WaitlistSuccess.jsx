@@ -256,105 +256,6 @@ export default function WaitlistSuccess() {
     const [status, setStatus] = useState('verifying'); // verifying, registering, success, error
     const [userData, setUserData] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
-    const [isRecording, setIsRecording] = useState(false);
-    const [recordingProgress, setRecordingProgress] = useState(0);
-
-    const handleDownloadAnimation = async () => {
-        const element = document.getElementById('waitlist-card-export');
-        if (!element || isRecording) return;
-
-        setIsRecording(true);
-        setRecordingProgress(0);
-
-        try {
-            const htmlToImage = await import('html-to-image');
-            const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-            const { fetchFile, toBlobURL } = await import('@ffmpeg/util');
-
-            const DURATION_MS = 3000;
-            const OUTPUT_FPS = 60;
-            const CAPTURE_INTERVAL_MS = 50; // ~20fps unique frames
-            const PIXEL_RATIO = 2;
-
-            // --- Phase 1: Load ffmpeg wasm core from CDN (lazy, no impact on page load) ---
-            const ffmpeg = new FFmpeg();
-            ffmpeg.on('progress', ({ progress }) => {
-                // Encoding phase maps to 50–100% progress
-                setRecordingProgress(50 + Math.round(progress * 50));
-            });
-
-            await ffmpeg.load({
-                coreURL: await toBlobURL(
-                    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
-                    'text/javascript'
-                ),
-                wasmURL: await toBlobURL(
-                    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
-                    'application/wasm'
-                ),
-            });
-
-            // --- Phase 2: Capture frames (maps to 0–50% progress) ---
-            const frames = [];
-            let elapsed = 0;
-
-            while (elapsed < DURATION_MS) {
-                const dataUrl = await htmlToImage.toPng(element, {
-                    quality: 1,
-                    pixelRatio: PIXEL_RATIO,
-                    style: { transform: 'none', margin: '0' },
-                });
-                frames.push(dataUrl);
-                setRecordingProgress(Math.round((elapsed / DURATION_MS) * 50)); // 0–50%
-                await new Promise((r) => setTimeout(r, CAPTURE_INTERVAL_MS));
-                elapsed += CAPTURE_INTERVAL_MS;
-            }
-
-            // --- Phase 3: Write frames to ffmpeg virtual FS ---
-            for (let i = 0; i < frames.length; i++) {
-                const frameNum = String(i).padStart(4, '0');
-                await ffmpeg.writeFile(`frame${frameNum}.png`, await fetchFile(frames[i]));
-            }
-
-            // Ensure dimensions are even numbers (H.264 requirement)
-            const dimImg = new Image();
-            dimImg.src = frames[0];
-            await new Promise((r) => { dimImg.onload = r; });
-            const w = Math.floor((dimImg.width) / 2) * 2;
-            const h = Math.floor((dimImg.height) / 2) * 2;
-            const capturedFps = Math.round(1000 / CAPTURE_INTERVAL_MS);
-
-            // --- Phase 4: Encode to H.264 MP4 at 60fps ---
-            await ffmpeg.exec([
-                '-framerate', String(capturedFps),
-                '-i', 'frame%04d.png',
-                '-vf', `scale=${w}:${h}`,
-                '-c:v', 'libx264',
-                '-preset', 'fast',
-                '-crf', '18',
-                '-pix_fmt', 'yuv420p',
-                '-r', String(OUTPUT_FPS),
-                'output.mp4',
-            ]);
-
-            // --- Phase 5: Download ---
-            const data = await ffmpeg.readFile('output.mp4');
-            const blob = new Blob([data.buffer], { type: 'video/mp4' });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.download = `latents-stamp-${userData?.rank ?? 1}.mp4`;
-            link.href = url;
-            link.click();
-            URL.revokeObjectURL(url);
-
-        } catch (err) {
-            console.error('Animation download failed:', err);
-            alert('Animation download failed. Please try again.');
-        } finally {
-            setIsRecording(false);
-            setRecordingProgress(0);
-        }
-    };
 
     useEffect(() => {
         const handleAuth = async () => {
@@ -546,8 +447,7 @@ export default function WaitlistSuccess() {
                                     />
                                 </div>
 
-                                <div className="flex flex-col gap-3 mt-6 w-full max-w-[340px] items-center">
-                                    {/* Static PNG download */}
+                                <div className="flex gap-3 mt-6 w-full max-w-[340px] justify-center">
                                     <button
                                         onClick={async () => {
                                             const element = document.getElementById('waitlist-card-export');
@@ -557,7 +457,10 @@ export default function WaitlistSuccess() {
                                                 const dataUrl = await htmlToImage.toPng(element, {
                                                     quality: 1,
                                                     pixelRatio: 4,
-                                                    style: { transform: 'none', margin: '0' }
+                                                    style: {
+                                                        transform: 'none',
+                                                        margin: '0',
+                                                    }
                                                 });
                                                 const link = document.createElement('a');
                                                 link.download = `latents-stamp-${userData.rank}.png`;
@@ -568,33 +471,10 @@ export default function WaitlistSuccess() {
                                                 alert('Download failed. Please try again.');
                                             }
                                         }}
-                                        className="w-full flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-black transition-all shadow-lg"
+                                        className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-black transition-all shadow-lg"
                                     >
                                         <Download size={16} />
                                         <span>Download Stamp</span>
-                                    </button>
-
-                                    {/* Animated MP4 download */}
-                                    <button
-                                        onClick={handleDownloadAnimation}
-                                        disabled={isRecording}
-                                        className="w-full flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                                    >
-                                        {isRecording ? (
-                                            <>
-                                                <Loader2 size={16} className="animate-spin" />
-                                                <span>
-                                                    {recordingProgress < 50
-                                                        ? `Capturing… ${recordingProgress * 2}%`
-                                                        : `Encoding… ${(recordingProgress - 50) * 2}%`}
-                                                </span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Download size={16} />
-                                                <span>Download Animation</span>
-                                            </>
-                                        )}
                                     </button>
                                 </div>
                             </div>
