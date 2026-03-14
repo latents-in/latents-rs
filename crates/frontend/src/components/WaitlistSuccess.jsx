@@ -444,7 +444,6 @@ export default function WaitlistSuccess() {
                                         autoplay
                                         loop={false}
                                         style={{ width: '100%', height: '100%' }}
-                                        renderConfig={{ autoResize: true }}
                                     />
                                 </div>
 
