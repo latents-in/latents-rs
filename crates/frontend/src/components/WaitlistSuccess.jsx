@@ -268,83 +268,89 @@ export default function WaitlistSuccess() {
 
         try {
             const htmlToImage = await import('html-to-image');
+            const { FFmpeg } = await import('@ffmpeg/ffmpeg');
+            const { fetchFile, toBlobURL } = await import('@ffmpeg/util');
 
             const DURATION_MS = 3000;
-            const FPS = 15;
-            const FRAME_INTERVAL = 1000 / FPS;
+            const OUTPUT_FPS = 60;
+            const CAPTURE_INTERVAL_MS = 50; // ~20fps unique frames
             const PIXEL_RATIO = 2;
 
-            // Capture first frame to get dimensions
-            const firstFrame = await htmlToImage.toPng(element, {
-                quality: 1,
-                pixelRatio: PIXEL_RATIO,
-                style: { transform: 'none', margin: '0' },
+            // --- Phase 1: Load ffmpeg wasm core from CDN (lazy, no impact on page load) ---
+            const ffmpeg = new FFmpeg();
+            ffmpeg.on('progress', ({ progress }) => {
+                // Encoding phase maps to 50–100% progress
+                setRecordingProgress(50 + Math.round(progress * 50));
             });
-            const firstImg = new Image();
-            await new Promise((res) => { firstImg.onload = res; firstImg.src = firstFrame; });
 
-            const canvas = document.createElement('canvas');
-            canvas.width = firstImg.width;
-            canvas.height = firstImg.height;
-            const ctx = canvas.getContext('2d');
+            await ffmpeg.load({
+                coreURL: await toBlobURL(
+                    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.js',
+                    'text/javascript'
+                ),
+                wasmURL: await toBlobURL(
+                    'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd/ffmpeg-core.wasm',
+                    'application/wasm'
+                ),
+            });
 
-            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-                ? 'video/webm;codecs=vp9'
-                : 'video/webm';
-
-            const stream = canvas.captureStream(FPS);
-            const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
-            const chunks = [];
-
-            recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-            recorder.onstop = () => {
-                const blob = new Blob(chunks, { type: 'video/webm' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.download = `latents-stamp-${userData?.rank ?? 1}.webm`;
-                link.href = url;
-                link.click();
-                URL.revokeObjectURL(url);
-                setIsRecording(false);
-                setRecordingProgress(0);
-            };
-
-            recorder.start();
-            // Draw first frame immediately
-            ctx.drawImage(firstImg, 0, 0);
-
+            // --- Phase 2: Capture frames (maps to 0–50% progress) ---
+            const frames = [];
             let elapsed = 0;
 
-            const captureNext = async () => {
-                if (elapsed >= DURATION_MS) {
-                    recorder.stop();
-                    return;
-                }
-                try {
-                    const dataUrl = await htmlToImage.toPng(element, {
-                        quality: 1,
-                        pixelRatio: PIXEL_RATIO,
-                        style: { transform: 'none', margin: '0' },
-                    });
-                    const img = new Image();
-                    img.onload = () => {
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0);
-                        elapsed += FRAME_INTERVAL;
-                        setRecordingProgress(Math.min(100, Math.round((elapsed / DURATION_MS) * 100)));
-                        setTimeout(captureNext, FRAME_INTERVAL);
-                    };
-                    img.src = dataUrl;
-                } catch (err) {
-                    console.error('Frame capture error:', err);
-                    recorder.stop();
-                }
-            };
+            while (elapsed < DURATION_MS) {
+                const dataUrl = await htmlToImage.toPng(element, {
+                    quality: 1,
+                    pixelRatio: PIXEL_RATIO,
+                    style: { transform: 'none', margin: '0' },
+                });
+                frames.push(dataUrl);
+                setRecordingProgress(Math.round((elapsed / DURATION_MS) * 50)); // 0–50%
+                await new Promise((r) => setTimeout(r, CAPTURE_INTERVAL_MS));
+                elapsed += CAPTURE_INTERVAL_MS;
+            }
 
-            setTimeout(captureNext, FRAME_INTERVAL);
+            // --- Phase 3: Write frames to ffmpeg virtual FS ---
+            for (let i = 0; i < frames.length; i++) {
+                const frameNum = String(i).padStart(4, '0');
+                await ffmpeg.writeFile(`frame${frameNum}.png`, await fetchFile(frames[i]));
+            }
+
+            // Ensure dimensions are even numbers (H.264 requirement)
+            const dimImg = new Image();
+            dimImg.src = frames[0];
+            await new Promise((r) => { dimImg.onload = r; });
+            const w = Math.floor((dimImg.width) / 2) * 2;
+            const h = Math.floor((dimImg.height) / 2) * 2;
+            const capturedFps = Math.round(1000 / CAPTURE_INTERVAL_MS);
+
+            // --- Phase 4: Encode to H.264 MP4 at 60fps ---
+            await ffmpeg.exec([
+                '-framerate', String(capturedFps),
+                '-i', 'frame%04d.png',
+                '-vf', `scale=${w}:${h}`,
+                '-c:v', 'libx264',
+                '-preset', 'fast',
+                '-crf', '18',
+                '-pix_fmt', 'yuv420p',
+                '-r', String(OUTPUT_FPS),
+                'output.mp4',
+            ]);
+
+            // --- Phase 5: Download ---
+            const data = await ffmpeg.readFile('output.mp4');
+            const blob = new Blob([data.buffer], { type: 'video/mp4' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = `latents-stamp-${userData?.rank ?? 1}.mp4`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+
         } catch (err) {
             console.error('Animation download failed:', err);
             alert('Animation download failed. Please try again.');
+        } finally {
             setIsRecording(false);
             setRecordingProgress(0);
         }
@@ -568,7 +574,7 @@ export default function WaitlistSuccess() {
                                         <span>Download Stamp</span>
                                     </button>
 
-                                    {/* Animated WebM download */}
+                                    {/* Animated MP4 download */}
                                     <button
                                         onClick={handleDownloadAnimation}
                                         disabled={isRecording}
@@ -577,7 +583,11 @@ export default function WaitlistSuccess() {
                                         {isRecording ? (
                                             <>
                                                 <Loader2 size={16} className="animate-spin" />
-                                                <span>Recording… {recordingProgress}%</span>
+                                                <span>
+                                                    {recordingProgress < 50
+                                                        ? `Capturing… ${recordingProgress * 2}%`
+                                                        : `Encoding… ${(recordingProgress - 50) * 2}%`}
+                                                </span>
                                             </>
                                         ) : (
                                             <>
