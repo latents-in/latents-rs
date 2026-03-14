@@ -256,6 +256,99 @@ export default function WaitlistSuccess() {
     const [status, setStatus] = useState('verifying'); // verifying, registering, success, error
     const [userData, setUserData] = useState(null);
     const [errorMessage, setErrorMessage] = useState('');
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingProgress, setRecordingProgress] = useState(0);
+
+    const handleDownloadAnimation = async () => {
+        const element = document.getElementById('waitlist-card-export');
+        if (!element || isRecording) return;
+
+        setIsRecording(true);
+        setRecordingProgress(0);
+
+        try {
+            const htmlToImage = await import('html-to-image');
+
+            const DURATION_MS = 3000;
+            const FPS = 15;
+            const FRAME_INTERVAL = 1000 / FPS;
+            const PIXEL_RATIO = 2;
+
+            // Capture first frame to get dimensions
+            const firstFrame = await htmlToImage.toPng(element, {
+                quality: 1,
+                pixelRatio: PIXEL_RATIO,
+                style: { transform: 'none', margin: '0' },
+            });
+            const firstImg = new Image();
+            await new Promise((res) => { firstImg.onload = res; firstImg.src = firstFrame; });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = firstImg.width;
+            canvas.height = firstImg.height;
+            const ctx = canvas.getContext('2d');
+
+            const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                ? 'video/webm;codecs=vp9'
+                : 'video/webm';
+
+            const stream = canvas.captureStream(FPS);
+            const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+            const chunks = [];
+
+            recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+            recorder.onstop = () => {
+                const blob = new Blob(chunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.download = `latents-stamp-${userData?.rank ?? 1}.webm`;
+                link.href = url;
+                link.click();
+                URL.revokeObjectURL(url);
+                setIsRecording(false);
+                setRecordingProgress(0);
+            };
+
+            recorder.start();
+            // Draw first frame immediately
+            ctx.drawImage(firstImg, 0, 0);
+
+            let elapsed = 0;
+
+            const captureNext = async () => {
+                if (elapsed >= DURATION_MS) {
+                    recorder.stop();
+                    return;
+                }
+                try {
+                    const dataUrl = await htmlToImage.toPng(element, {
+                        quality: 1,
+                        pixelRatio: PIXEL_RATIO,
+                        style: { transform: 'none', margin: '0' },
+                    });
+                    const img = new Image();
+                    img.onload = () => {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0);
+                        elapsed += FRAME_INTERVAL;
+                        setRecordingProgress(Math.min(100, Math.round((elapsed / DURATION_MS) * 100)));
+                        setTimeout(captureNext, FRAME_INTERVAL);
+                    };
+                    img.src = dataUrl;
+                } catch (err) {
+                    console.error('Frame capture error:', err);
+                    recorder.stop();
+                }
+            };
+
+            setTimeout(captureNext, FRAME_INTERVAL);
+        } catch (err) {
+            console.error('Animation download failed:', err);
+            alert('Animation download failed. Please try again.');
+            setIsRecording(false);
+            setRecordingProgress(0);
+        }
+    };
 
     useEffect(() => {
         const handleAuth = async () => {
@@ -447,7 +540,8 @@ export default function WaitlistSuccess() {
                                     />
                                 </div>
 
-                                <div className="flex gap-3 mt-6 w-full max-w-[340px] justify-center">
+                                <div className="flex flex-col gap-3 mt-6 w-full max-w-[340px] items-center">
+                                    {/* Static PNG download */}
                                     <button
                                         onClick={async () => {
                                             const element = document.getElementById('waitlist-card-export');
@@ -457,10 +551,7 @@ export default function WaitlistSuccess() {
                                                 const dataUrl = await htmlToImage.toPng(element, {
                                                     quality: 1,
                                                     pixelRatio: 4,
-                                                    style: {
-                                                        transform: 'none',
-                                                        margin: '0',
-                                                    }
+                                                    style: { transform: 'none', margin: '0' }
                                                 });
                                                 const link = document.createElement('a');
                                                 link.download = `latents-stamp-${userData.rank}.png`;
@@ -471,10 +562,29 @@ export default function WaitlistSuccess() {
                                                 alert('Download failed. Please try again.');
                                             }
                                         }}
-                                        className="flex-1 flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-black transition-all shadow-lg"
+                                        className="w-full flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold bg-gray-900 text-white hover:bg-black transition-all shadow-lg"
                                     >
                                         <Download size={16} />
                                         <span>Download Stamp</span>
+                                    </button>
+
+                                    {/* Animated WebM download */}
+                                    <button
+                                        onClick={handleDownloadAnimation}
+                                        disabled={isRecording}
+                                        className="w-full flex items-center justify-center space-x-2 py-3 px-6 rounded-xl text-sm font-semibold border-2 border-gray-900 text-gray-900 hover:bg-gray-100 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                                    >
+                                        {isRecording ? (
+                                            <>
+                                                <Loader2 size={16} className="animate-spin" />
+                                                <span>Recording… {recordingProgress}%</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Download size={16} />
+                                                <span>Download Animation</span>
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>
