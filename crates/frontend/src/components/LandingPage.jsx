@@ -57,6 +57,16 @@ export default function LandingPage() {
                 { timeout: 5000, enableHighAccuracy: false }
             );
         }
+
+        // Listen for waitlist submissions coming from the Navbar's modal
+        const handleWaitlistEvent = (e) => {
+            setStatus(e.detail);
+        };
+        window.addEventListener('waitlist-submitted', handleWaitlistEvent);
+        
+        return () => {
+            window.removeEventListener('waitlist-submitted', handleWaitlistEvent);
+        };
     }, []);
 
     // Fetch location from coordinates using a free reverse geocoding API
@@ -351,4 +361,3 @@ export default function LandingPage() {
         </div>
     );
 }
-
