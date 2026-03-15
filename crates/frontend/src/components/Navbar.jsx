@@ -1,12 +1,16 @@
 import { useState } from "react";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import JoinWaitlistModal from "./JoinWaitlistModal";
 import latentsLogo from "../assets/latents.webp";
 
 export default function Navbar() {
     const [hidden, setHidden] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
+
+    const location = useLocation();
+    const isWaitlistSuccessPage = location.pathname === '/verify';
 
     const { scrollY } = useScroll();
 
@@ -20,19 +24,30 @@ export default function Navbar() {
     });
 
     const handleJoinSubmit = async ({ name, email, role }) => {
-        // Save to localStorage so WaitlistSuccess can pick it up after redirect
-        if (role) localStorage.setItem('latents_pending_role', role);
-        if (name) localStorage.setItem('latents_pending_name', name);
+        setIsLoading(true);
+        try {
+            // Save to localStorage so WaitlistSuccess can pick it up after redirect
+            if (role) localStorage.setItem('latents_pending_role', role);
+            if (name) localStorage.setItem('latents_pending_name', name);
 
-        const { supabase } = await import('../lib/supabase');
-        const { error } = await supabase.auth.signInWithOtp({
-            email,
-            options: {
-                data: { full_name: name, role: role || 'Unknown' },
-                emailRedirectTo: `${window.location.origin}/verify`,
-            },
-        });
-        if (error) throw error;
+            const { supabase } = await import('../lib/supabase');
+            const { error } = await supabase.auth.signInWithOtp({
+                email,
+                options: {
+                    data: { full_name: name, role: role || 'Unknown' },
+                    emailRedirectTo: `${window.location.origin}/verify`,
+                },
+            });
+            if (error) throw error;
+            
+            setIsModalOpen(false);
+            // alert("✨ Magic link sent! Check your inbox.");
+        } catch (error) {
+            console.error("Submission error:", error);
+            alert("Failed to send magic link: " + error.message);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -61,12 +76,21 @@ export default function Navbar() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 pr-1">
-                        <button
-                            onClick={() => setIsModalOpen(true)}
-                            className="pill-button pill-button-primary px-5 py-2.5 text-[15px] font-bold"
-                        >
-                            Get Early Access
-                        </button>
+                        {isWaitlistSuccessPage ? (
+                            <Link
+                                to="/"
+                                className="pill-button pill-button-primary px-5 py-2.5 text-[15px] font-bold"
+                            >
+                                Back to Home
+                            </Link>
+                        ) : (
+                            <button
+                                onClick={() => setIsModalOpen(true)}
+                                className="pill-button pill-button-primary px-5 py-2.5 text-[15px] font-bold"
+                            >
+                                Get Early Access
+                            </button>
+                        )}
                     </div>
                 </div>
             </motion.nav>
@@ -75,6 +99,7 @@ export default function Navbar() {
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleJoinSubmit}
+                isLoading={isLoading}
             />
         </>
     );
