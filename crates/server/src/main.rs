@@ -30,7 +30,10 @@ async fn main() -> anyhow::Result<()> {
     // Database connection
     info!("Connecting to database...");
     let pool = PgPoolOptions::new()
-        .max_connections(10)
+        .max_connections(3) // Reduced from 10 to avoid exhausting free-tier PgBouncer
+        .min_connections(1)
+        .acquire_timeout(std::time::Duration::from_secs(12)) // Give PgBouncer more time to free a connection
+        .idle_timeout(std::time::Duration::from_secs(30)) // Release connections back to pool quickly
         .after_connect(|conn, _meta| {
             Box::pin(async move {
                 // Disable prepared statements for pgbouncer compatibility
