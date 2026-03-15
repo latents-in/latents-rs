@@ -333,7 +333,7 @@ export default function LandingPage() {
                                 }`}
                         >
                             {status === 'magic_link_sent'
-                                ? <span>✨ Magic link sent! Check your inbox — <strong>don't forget to look in your Promotions tab</strong> if you don't see it.</span>
+                                ? <span>✨Email link sent! Check your inbox — <strong>don't forget to look in your Spam/Promotions tab</strong> if you don't see it.</span>
                                 : status}
                         </motion.div>
                     )}
