@@ -107,13 +107,9 @@ export default function AdminPage() {
     const [sortField, setSortField] = useState('created_at');
     const [sortDir, setSortDir] = useState('desc');
 
-    // Show password gate if not authenticated
-    if (!authed) {
-        return <PasswordGate onUnlock={() => setAuthed(true)} />;
-    }
-
-    // ── Data fetching
+    // ── Data fetching — must be BEFORE any early returns (Rules of Hooks)
     useEffect(() => {
+        if (!authed) return;
         const load = async () => {
             try {
                 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -128,7 +124,12 @@ export default function AdminPage() {
             }
         };
         load();
-    }, []);
+    }, [authed]); // re-runs when user authenticates
+
+    // Show password gate if not authenticated
+    if (!authed) {
+        return <PasswordGate onUnlock={() => setAuthed(true)} />;
+    }
 
     // ── Sorting
     const handleSort = (field) => {
