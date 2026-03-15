@@ -134,7 +134,7 @@ export default function JoinWaitlistModal({ isOpen, onClose, onSubmit, isLoading
                                         disabled={isLoading || !role}
                                         className="w-full mt-2 px-5 py-3.5 bg-[#1d1d1f] hover:bg-black transition-colors rounded-xl flex items-center justify-center text-white text-[15px] sm:text-[16px] font-semibold tracking-wide shadow-sm disabled:opacity-75 disabled:cursor-not-allowed"
                                     >
-                                        {isLoading ? 'Sending Magic Link...' : 'Verify your email'}
+                                        {isLoading ? 'Joining...' : 'Join Waitlist'}
                                     </button>
                                 </form>
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { cn } from '../lib/utils';
-import { supabase } from '../lib/supabase';
+import { useNavigate } from 'react-router-dom';
 import JoinWaitlistModal from './JoinWaitlistModal';
 
 import one from '../assets/1.webp';
@@ -17,6 +17,7 @@ import ten from '../assets/10.webp';
 import dollarImg from '../assets/dollar.webp';
 
 export default function LandingPage() {
+    const navigate = useNavigate();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [status, setStatus] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -94,37 +95,26 @@ export default function LandingPage() {
         setStatus('');
 
         try {
-            // Use browser location if available, otherwise just 'Unknown'
             const locationToSend = browserLocation || 'Unknown';
+            const API_URL = import.meta.env.VITE_API_URL || '';
 
-            // Save role + name in localStorage so WaitlistSuccess can read them
-            // after the magic link redirect (Supabase doesn't always update
-            // existing user metadata on repeat OTP sign-ins)
-            if (role) localStorage.setItem('latents_pending_role', role);
-            if (name) localStorage.setItem('latents_pending_name', name);
-
-            // Send Magic Link via Supabase Auth
-            const { error } = await supabase.auth.signInWithOtp({
-                email: email,
-                options: {
-                    // Send user metadata to Supabase so we have it after they click the link
-                    data: {
-                        full_name: name,
-                        location: locationToSend,
-                        role: role || 'Unknown',
-                    },
-                    // Redirect back to home so we can intercept the auth change and register them
-                    emailRedirectTo: `${window.location.origin}/verify`
-                }
+            const response = await fetch(`${API_URL}/api/waitlist`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, name, location: locationToSend, role }),
             });
 
-            if (error) throw error;
+            const data = await response.json();
 
-            setStatus('magic_link_sent');
+            if (!response.ok && response.status !== 409) {
+                throw new Error(data.message || data.error || 'Failed to join waitlist');
+            }
+
             setIsModalOpen(false);
+            navigate('/verify', { state: { name, rank: data.rank || 1, role } });
         } catch (error) {
             console.error("Submission error:", error);
-            setStatus('Failed to send magic link: ' + error.message);
+            setStatus('Error: ' + error.message);
         } finally {
             setIsLoading(false);
         }
@@ -327,7 +317,7 @@ export default function LandingPage() {
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                         </svg>
-                        Secured by Magic Link
+                        Free &amp; Instant
                     </p>
                 </motion.div>
 
@@ -337,14 +327,9 @@ export default function LandingPage() {
                             initial={{ opacity: 0, y: 15 }}
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
-                            className={`mt-6 text-[15px] font-medium tracking-tight px-6 py-3 rounded-full border backdrop-blur shadow-sm ${status === 'magic_link_sent'
-                                ? 'bg-green-50/90 text-green-800 border-green-200'
-                                : 'bg-red-50/90 text-red-800 border-red-200'
-                                }`}
+                            className="mt-6 text-[15px] font-medium tracking-tight px-6 py-3 rounded-full border backdrop-blur shadow-sm bg-red-50/90 text-red-800 border-red-200"
                         >
-                            {status === 'magic_link_sent'
-                                ? <span>✨Email link sent! Check your inbox — <strong>don't forget to look in your Spam/Promotions tab</strong> if you don't see it.</span>
-                                : status}
+                            {status}
                         </motion.div>
                     )}
                 </AnimatePresence>

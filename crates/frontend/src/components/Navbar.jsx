@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion, useScroll, useMotionValueEvent } from "framer-motion";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import JoinWaitlistModal from "./JoinWaitlistModal";
 import latentsLogo from "../assets/latents.webp";
 
 export default function Navbar() {
+    const navigate = useNavigate();
     const [hidden, setHidden] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
@@ -26,27 +27,24 @@ export default function Navbar() {
     const handleJoinSubmit = async ({ name, email, role }) => {
         setIsLoading(true);
         try {
-            // Save to localStorage so WaitlistSuccess can pick it up after redirect
-            if (role) localStorage.setItem('latents_pending_role', role);
-            if (name) localStorage.setItem('latents_pending_name', name);
-
-            const { supabase } = await import('../lib/supabase');
-            const { error } = await supabase.auth.signInWithOtp({
-                email,
-                options: {
-                    data: { full_name: name, role: role || 'Unknown' },
-                    emailRedirectTo: `${window.location.origin}/verify`,
-                },
+            const API_URL = import.meta.env.VITE_API_URL || '';
+            const response = await fetch(`${API_URL}/api/waitlist`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, name, location: 'Unknown', role }),
             });
-            if (error) throw error;
-            
-            // Dispatch a global event so LandingPage can show the generic success box!
-            window.dispatchEvent(new CustomEvent('waitlist-submitted', { detail: 'magic_link_sent' }));
-            
+
+            const data = await response.json();
+
+            if (!response.ok && response.status !== 409) {
+                throw new Error(data.message || data.error || 'Failed to join waitlist');
+            }
+
             setIsModalOpen(false);
+            navigate('/verify', { state: { name, rank: data.rank || 1, role } });
         } catch (error) {
             console.error("Submission error:", error);
-            window.dispatchEvent(new CustomEvent('waitlist-submitted', { detail: 'Failed to send magic link: ' + error.message }));
+            window.dispatchEvent(new CustomEvent('waitlist-submitted', { detail: 'Error: ' + error.message }));
             setIsModalOpen(false);
         } finally {
             setIsLoading(false);

@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { cn } from '../lib/utils';
 import { Check, Loader2, Command, Download } from 'lucide-react';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
@@ -253,91 +252,24 @@ const InteractiveStamp = ({ name, roleId, customRole, number, date }) => {
 
 export default function WaitlistSuccess() {
     const navigate = useNavigate();
-    const [status, setStatus] = useState('verifying'); // verifying, registering, success, error
+    const location = useLocation();
+    const [status, setStatus] = useState('loading');
     const [userData, setUserData] = useState(null);
-    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
-        const handleAuth = async () => {
-            try {
-                // 1. Check if we have a session (means magic link was successful)
-                const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-
-                if (sessionError) throw sessionError;
-                if (!session) {
-                    throw new Error('No active session found. Please try logging in again.');
-                }
-
-                const user = session.user;
-                const metadata = user.user_metadata || {};
-
-                // Read role/name from localStorage (saved before magic link was sent)
-                // This is more reliable than metadata for existing Supabase users
-                const pendingRole = localStorage.getItem('latents_pending_role');
-                const pendingName = localStorage.getItem('latents_pending_name');
-                // Clean up localStorage after reading
-                localStorage.removeItem('latents_pending_role');
-                localStorage.removeItem('latents_pending_name');
-
-                const resolvedRole = pendingRole || metadata.role || null;
-                const resolvedName = pendingName || metadata.full_name || 'Early Adopter';
-
-                setStatus('registering');
-
-                // 2. Register user to our Rust backend to get their Rank
-                const API_URL = import.meta.env.VITE_API_URL || '';
-                const response = await fetch(`${API_URL}/api/waitlist`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        email: user.email,
-                        name: resolvedName,
-                        location: metadata.location || 'Unknown',
-                        role: resolvedRole,
-                    }),
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    // If they are already on the waitlist, our backend will throw a 409 conflict
-                    // But let's just pretend it's a success so they get their card anyway
-                    if (response.status !== 409) {
-                        throw new Error(data.message || data.error || 'Failed to register to waitlist');
-                    }
-                }
-
-                // 3. Set standard user data for the visual card
-                setUserData({
-                    name: resolvedName,
-                    rank: data.rank || 1,
-                    role: resolvedRole || data.role || null,
-                });
-
-                setStatus('success');
-
-            } catch (error) {
-                console.error('Waitlist verification error:', error);
-                setErrorMessage(error.message);
-                setStatus('error');
-            }
-        };
-
-        handleAuth();
-
-        // Listen for auth state changes just in case they just clicked the link
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN') {
-                handleAuth();
-            }
-        });
-
-        return () => {
-            subscription.unsubscribe();
-        };
-    }, []);
+        const state = location.state;
+        if (state && state.rank) {
+            setUserData({
+                name: state.name || 'Early Adopter',
+                rank: state.rank,
+                role: state.role || null,
+            });
+            setStatus('success');
+        } else {
+            // No state means someone navigated here directly — redirect home
+            navigate('/', { replace: true });
+        }
+    }, [location.state, navigate]);
 
     return (
         <div className="relative w-full min-h-screen bg-[#FDFDFD] overflow-hidden font-sans flex flex-col items-center justify-center p-6">
@@ -348,8 +280,8 @@ export default function WaitlistSuccess() {
             <div className="relative z-10 w-full max-w-md mx-auto flex flex-col items-center">
 
                 <AnimatePresence mode="wait">
-                    {/* Loading States */}
-                    {(status === 'verifying' || status === 'registering') && (
+                    {/* Loading State */}
+                    {status === 'loading' && (
                         <motion.div
                             key="loading"
                             initial={{ opacity: 0, y: 10 }}
@@ -358,9 +290,7 @@ export default function WaitlistSuccess() {
                             className="flex flex-col items-center justify-center p-8 bg-white/70 backdrop-blur-2xl border border-white/60 shadow-xl ring-1 ring-black/[0.04] rounded-3xl w-full"
                         >
                             <Loader2 className="w-10 h-10 text-black animate-spin mb-4" />
-                            <h2 className="text-xl font-bold text-gray-900 mb-2">
-                                {status === 'verifying' ? 'Verifying Magic Link...' : 'Securing your spot...'}
-                            </h2>
+                            <h2 className="text-xl font-bold text-gray-900 mb-2">Securing your spot...</h2>
                             <p className="text-gray-500 text-center text-sm">
                                 Please wait a moment while we process your request.
                             </p>
