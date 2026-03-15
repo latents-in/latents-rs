@@ -12,14 +12,15 @@ pub async fn create_waitlist_entry(
 ) -> Result<u64> {
     let mut tx = db.begin().await?;
 
-    // 1. Insert the user (or ignore if already exists)
-    let _ = sqlx::query(
+    // 1. Insert the user (or ignore if already exists) and return created_at
+    let created_at: chrono::DateTime<Utc> = sqlx::query_scalar(
         r#"
         INSERT INTO waitlist (id, email, name, location, role, created_at)
         VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (email) DO UPDATE SET
             role = CASE WHEN waitlist.role IS NULL THEN EXCLUDED.role ELSE waitlist.role END,
             name = CASE WHEN waitlist.name IS NULL THEN EXCLUDED.name ELSE waitlist.name END
+        RETURNING created_at
         "#,
     )
     .bind(uuid::Uuid::new_v4().to_string())
@@ -28,19 +29,18 @@ pub async fn create_waitlist_entry(
     .bind(location)
     .bind(role)
     .bind(Utc::now())
-    .execute(&mut *tx)
+    .fetch_one(&mut *tx)
     .await?;
 
-    // 2. Get this user's rank using ROW_NUMBER() which gives a guaranteed unique sequential rank
+    // 2. Get this user's rank using a highly efficient COUNT(*) based on the created_at index
     let rank: i64 = sqlx::query_scalar(
         r#"
-        SELECT row_num FROM (
-            SELECT email, ROW_NUMBER() OVER (ORDER BY created_at ASC, id ASC) as row_num
-            FROM waitlist
-        ) ranked
-        WHERE email = $1
+        SELECT COUNT(*) + 1 
+        FROM waitlist 
+        WHERE created_at < $1 OR (created_at = $1 AND email <= $2)
         "#,
     )
+    .bind(created_at)
     .bind(email.to_lowercase())
     .fetch_one(&mut *tx)
     .await?;
