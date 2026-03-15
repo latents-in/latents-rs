@@ -5,7 +5,7 @@ FROM node:20-alpine AS frontend-builder
 
 WORKDIR /app/frontend
 COPY crates/frontend/package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY crates/frontend/ ./
 RUN npm run build
