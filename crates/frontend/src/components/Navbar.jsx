@@ -40,11 +40,14 @@ export default function Navbar() {
             });
             if (error) throw error;
             
+            // Dispatch a global event so LandingPage can show the generic success box!
+            window.dispatchEvent(new CustomEvent('waitlist-submitted', { detail: 'magic_link_sent' }));
+            
             setIsModalOpen(false);
-            // alert("✨ Magic link sent! Check your inbox.");
         } catch (error) {
             console.error("Submission error:", error);
-            alert("Failed to send magic link: " + error.message);
+            window.dispatchEvent(new CustomEvent('waitlist-submitted', { detail: 'Failed to send magic link: ' + error.message }));
+            setIsModalOpen(false);
         } finally {
             setIsLoading(false);
         }
