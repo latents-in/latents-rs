@@ -20,29 +20,35 @@ RUN apk add --no-cache musl-dev openssl-dev openssl-libs-static pkgconfig
 
 WORKDIR /app
 
-# Copy only dependency files
+# Copy only dependency files (workspace + inner crate)
 COPY Cargo.toml Cargo.lock ./
+COPY crates/server/Cargo.toml ./crates/server/
 
 # Create dummy server to compile dependencies
 RUN mkdir -p crates/server/src
 RUN echo "fn main() {}" > crates/server/src/main.rs
+RUN echo "" > crates/server/src/lib.rs
 
 # Build dependencies (this layer will cache)
 RUN cargo build --release -p latents-server
 
+# Clean up the dummy code artifacts so Cargo knows it needs to rebuild your actual code later
+RUN rm -f target/release/deps/latents_server*
+RUN rm -f target/release/deps/liblatents_server*
 
 # =============================================================================
 # Stage 3: Build Real Backend
 # =============================================================================
 FROM deps AS backend-builder
 
-# Copy real source now
-COPY crates/server ./crates/server
+# Copy real source code now
+COPY crates/server/src ./crates/server/src
+COPY crates/server/migrations ./crates/server/migrations
 
 # Copy frontend dist
 COPY --from=frontend-builder /app/frontend/dist ./crates/frontend/dist
 
-# Build final binary
+# Build final binary (this will be incredibly fast since deps are cached!)
 RUN cargo build --release -p latents-server
 
 
