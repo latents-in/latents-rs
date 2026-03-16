@@ -4,6 +4,7 @@ use std::env;
 #[derive(Debug, Clone)]
 pub struct Config {
     pub database_url: String,
+    pub direct_url: Option<String>,
     pub port: u16,
     pub environment: Environment,
 }
@@ -21,6 +22,8 @@ impl Config {
         let database_url = env::var("DATABASE_URL")
             .expect("DATABASE_URL must be set in environment");
 
+        let direct_url = env::var("DIRECT_URL").ok();
+
         let port = env::var("PORT")
             .ok()
             .and_then(|p| p.parse().ok())
@@ -36,6 +39,7 @@ impl Config {
 
         Ok(Self {
             database_url,
+            direct_url,
             port,
             environment,
         })
