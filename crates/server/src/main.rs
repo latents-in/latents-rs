@@ -35,13 +35,18 @@ async fn main() -> anyhow::Result<()> {
     connect_options = connect_options.statement_cache_capacity(0);
 
     // --- Temporary Migration Pool ---
-    // We create a special single-connection pool just for migrations. 
-    // `.pipeline_batches(false)` forces SQLx to use the simple query protocol, 
-    // which prevents the "prepared statement already exists" error through PgBouncer.
+    // We prefer using the DIRECT_URL (port 5432) for migrations because PgBouncer 
+    // Transaction Mode does not support the prepared statements used by SQLx migrations.
     info!("Running database migrations...");
-    let mut migration_options = connect_options.clone();
-    // This is the critical trick: disable pipelining to disable prep statements in migrations
-    migration_options = migration_options.pipeline_batches(false);
+    let migration_options = if let Some(direct) = &config.direct_url {
+        info!("Using DIRECT_URL for migrations");
+        direct.parse::<PgConnectOptions>()?
+    } else {
+        info!("DIRECT_URL not found, attempting migrations on Pooler with pipelining disabled");
+        let mut opts = connect_options.clone();
+        opts = opts.pipeline_batches(false);
+        opts
+    };
     
     let migration_pool = PgPoolOptions::new()
         .max_connections(1)
