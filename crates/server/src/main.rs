@@ -42,10 +42,8 @@ async fn main() -> anyhow::Result<()> {
         info!("Using DIRECT_URL for migrations");
         direct.parse::<PgConnectOptions>()?
     } else {
-        info!("DIRECT_URL not found, attempting migrations on Pooler with pipelining disabled");
-        let mut opts = connect_options.clone();
-        opts = opts.pipeline_batches(false);
-        opts
+        info!("DIRECT_URL not found, attempting migrations on Pooler (WARNING: may fail if not session mode)");
+        connect_options.clone()
     };
     
     let migration_pool = PgPoolOptions::new()
