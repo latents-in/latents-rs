@@ -8,7 +8,6 @@ use latents_server::{
     state::AppState,
 };
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
-use sqlx::ConnectOptions;
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -36,17 +35,11 @@ async fn main() -> anyhow::Result<()> {
     connect_options = connect_options.statement_cache_capacity(0);
 
     let pool = PgPoolOptions::new()
-        .max_connections(8)
-        .min_connections(0) // Don't fail startup if a connection can't be established immediately
-        .acquire_timeout(std::time::Duration::from_secs(30)) // Give it more time
-        .idle_timeout(std::time::Duration::from_secs(30))
-        .after_connect(|conn, _meta| {
-            Box::pin(async move {
-                // Additional safety for pgbouncer session cleaning
-                sqlx::query("DISCARD ALL").execute(conn).await?;
-                Ok(())
-            })
-        })
+        .max_connections(4) // More conservative for Supabase free/direct connections
+        .min_connections(0)
+        .acquire_timeout(std::time::Duration::from_secs(60)) // Be very patient on startup
+        .idle_timeout(std::time::Duration::from_millis(500)) // Release connections back to pool instantly (500ms)
+        .max_lifetime(std::time::Duration::from_secs(30)) // Refresh connections frequently
         .connect_with(connect_options)
         .await?;
 
