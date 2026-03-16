@@ -34,19 +34,38 @@ async fn main() -> anyhow::Result<()> {
     let mut connect_options = config.database_url.parse::<PgConnectOptions>()?;
     connect_options = connect_options.statement_cache_capacity(0);
 
+    // --- Temporary Migration Pool ---
+    // We create a special single-connection pool just for migrations. 
+    // `.pipeline_batches(false)` forces SQLx to use the simple query protocol, 
+    // which prevents the "prepared statement already exists" error through PgBouncer.
+    info!("Running database migrations...");
+    let mut migration_options = connect_options.clone();
+    // This is the critical trick: disable pipelining to disable prep statements in migrations
+    migration_options = migration_options.pipeline_batches(false);
+    
+    let migration_pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect_with(migration_options)
+        .await?;
+
+    sqlx::migrate!("./migrations")
+        .run(&migration_pool)
+        .await?;
+        
+    // Close the temporary pool
+    migration_pool.close().await;
+    info!("Migrations completed successfully");
+
+    // --- Main Application Pool ---
+    info!("Starting main connection pool...");
     let pool = PgPoolOptions::new()
-        .max_connections(150) // Optimal for Supabase Pooler (Transaction Mode)
-        .min_connections(2)
+        .max_connections(100) // Optimal for Supabase Pooler (Transaction Mode)
+        .min_connections(0)
         .acquire_timeout(std::time::Duration::from_secs(60)) // Be very patient on startup
         .idle_timeout(std::time::Duration::from_secs(30)) // Keep connections alive for reuse
         .max_lifetime(std::time::Duration::from_secs(1800)) // 30 minutes
         .connect_with(connect_options)
         .await?;
-
-    // Run migrations
-    info!("Running database migrations...");
-    sqlx::migrate!("./migrations").run(&pool).await?;
-    info!("Migrations completed");
 
     let state = Arc::new(AppState::new(pool));
 
