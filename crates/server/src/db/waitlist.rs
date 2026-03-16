@@ -29,6 +29,7 @@ pub async fn create_waitlist_entry(
     .bind(location)
     .bind(role)
     .bind(Utc::now())
+    .persistent(false)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -42,6 +43,7 @@ pub async fn create_waitlist_entry(
     )
     .bind(created_at)
     .bind(email.to_lowercase())
+    .persistent(false)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -58,6 +60,7 @@ pub async fn get_all_waitlist_entries(db: &PgPool) -> Result<Vec<WaitlistEntry>>
         ORDER BY created_at DESC
         "#,
     )
+    .persistent(false)
     .fetch_all(db)
     .await?;
 
