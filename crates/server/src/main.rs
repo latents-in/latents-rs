@@ -35,11 +35,11 @@ async fn main() -> anyhow::Result<()> {
     connect_options = connect_options.statement_cache_capacity(0);
 
     let pool = PgPoolOptions::new()
-        .max_connections(4) // More conservative for Supabase free/direct connections
+        .max_connections(10) // Safe buffer for Supabase free tier (15 total)
         .min_connections(0)
         .acquire_timeout(std::time::Duration::from_secs(60)) // Be very patient on startup
-        .idle_timeout(std::time::Duration::from_millis(500)) // Release connections back to pool instantly (500ms)
-        .max_lifetime(std::time::Duration::from_secs(30)) // Refresh connections frequently
+        .idle_timeout(std::time::Duration::from_secs(30)) // Keep connections alive for reuse
+        .max_lifetime(std::time::Duration::from_secs(1800)) // 30 minutes
         .connect_with(connect_options)
         .await?;
 
