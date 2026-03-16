@@ -1,43 +1,87 @@
-#29 [backend-builder 1/4] COPY crates/server/src ./crates/server/src
-#29 DONE 0.1s
-#30 [backend-builder 2/4] COPY crates/server/migrations ./crates/server/migrations
-#30 DONE 0.1s
-#31 [backend-builder 3/4] COPY --from=frontend-builder /app/frontend/dist ./crates/frontend/dist
-#31 DONE 0.1s
-#32 [backend-builder 4/4] RUN cargo build --release -p latents-server
-#32 0.659    Compiling latents-server v0.1.0 (/app/crates/server)
-#32 83.38     Finished `release` profile [optimized] target(s) in 1m 23s
-#32 DONE 91.1s
-#33 [stage-3 2/4] RUN apk add --no-cache ca-certificates
-#33 CACHED
-#34 [stage-3 3/4] WORKDIR /app
-#34 sha256:4cadf9049b725ec1299dbc5f242d8ca567dd69d8b8370dcfec7f02aa969fea61 296.09kB / 296.09kB 0.0s done
-#34 extracting sha256:4cadf9049b725ec1299dbc5f242d8ca567dd69d8b8370dcfec7f02aa969fea61
-#34 extracting sha256:4cadf9049b725ec1299dbc5f242d8ca567dd69d8b8370dcfec7f02aa969fea61 0.8s done
-#34 sha256:15cf75694a73d47e9eb2bab8fedc9639e44dfdff11c233ec6119bd382bc249f8 92B / 92B done
-#34 extracting sha256:15cf75694a73d47e9eb2bab8fedc9639e44dfdff11c233ec6119bd382bc249f8 0.1s done
-#34 CACHED
-#35 [stage-3 4/4] COPY --from=backend-builder /app/target/release/latents-server /usr/local/bin/
-#35 DONE 0.2s
-#36 exporting to docker image format
-#36 exporting layers
-#36 exporting layers 0.5s done
-#36 exporting manifest sha256:70005f55decdcd9cba09c08d5d8cd6583e4f792856c502cdbadbb17f72e97f35 0.0s done
-#36 exporting config sha256:3bb7106964a612914d13be89866705260a4309d436b3885b32f20c30cbebf9b5 0.0s done
-#36 DONE 0.5s
-#37 exporting cache to client directory
-#37 preparing build cache for export
-#37 writing cache image manifest sha256:dec846320f0a58a6fcea61270ccc95f46fa4cd1795923cee65a907ba1e426668 0.0s done
-#37 DONE 43.7s
-Pushing image to registry...
-Upload succeeded
-==> Deploying...
-==> Setting WEB_CONCURRENCY=1 by default, based on available CPUs in the instance
-2026-03-16T10:19:01.208486Z  INFO latents_server: Starting server in Development mode
-2026-03-16T10:19:01.208544Z  INFO latents_server: Connecting to database...
-==> No open ports detected, continuing to scan...
-Menu
-==> Docs on specifying a port: https://render.com/docs/web-services#port-binding
-Error: pool timed out while waiting for an open connection
-==> Exited with status 1
-==> Common ways to troubleshoot your deploy: https://render.com/docs/troubleshooting-deploys
+use axum::{
+    routing::{get, post},
+    Router,
+};
+use latents_server::{
+    config::Config,
+    handlers::{add_to_waitlist, get_waitlist, health_check, serve_static},
+    state::AppState,
+};
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use sqlx::ConnectOptions;
+use std::sync::Arc;
+use tower_http::cors::{Any, CorsLayer};
+use tower_http::trace::TraceLayer;
+use tracing::info;
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    // Initialize tracing
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "latents_server=debug,tower_http=debug".into()),
+        )
+        .init();
+
+    // Load configuration
+    let config = Config::from_env()?;
+    info!("Starting server in {:?} mode", config.environment);
+
+    // Database connection
+    info!("Connecting to database...");
+    
+    // Parse connection string and disable statement cache for PgBouncer compatibility
+    let mut connect_options = config.database_url.parse::<PgConnectOptions>()?;
+    connect_options = connect_options.statement_cache_capacity(0);
+
+    let pool = PgPoolOptions::new()
+        .max_connections(8)
+        .min_connections(0) // Don't fail startup if a connection can't be established immediately
+        .acquire_timeout(std::time::Duration::from_secs(30)) // Give it more time
+        .idle_timeout(std::time::Duration::from_secs(30))
+        .after_connect(|conn, _meta| {
+            Box::pin(async move {
+                // Additional safety for pgbouncer session cleaning
+                sqlx::query("DISCARD ALL").execute(conn).await?;
+                Ok(())
+            })
+        })
+        .connect_with(connect_options)
+        .await?;
+
+    // Run migrations
+    info!("Running database migrations...");
+    sqlx::migrate!("./migrations").run(&pool).await?;
+    info!("Migrations completed");
+
+    let state = Arc::new(AppState::new(pool));
+
+    // CORS configuration
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
+    // Build router
+    let app = Router::new()
+        // API routes
+        .route("/api/health", get(health_check))
+        .route("/api/waitlist", post(add_to_waitlist).get(get_waitlist))
+        // Static files (catch-all)
+        .fallback(serve_static)
+        // Middleware
+        .layer(cors)
+        .layer(TraceLayer::new_for_http())
+        .with_state(state);
+
+    let addr = format!("0.0.0.0:{}", config.port);
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+
+    info!("🚀 Server running on http://{}", addr);
+    info!("📁 Serving static files from embedded frontend");
+
+    axum::serve(listener, app).await?;
+
+    Ok(())
+}
