@@ -63,7 +63,7 @@ async fn main() -> anyhow::Result<()> {
     info!("Starting main connection pool...");
     let pool = PgPoolOptions::new()
         .max_connections(100) // Optimal for Supabase Pooler (Transaction Mode)
-        .min_connections(0)
+        .min_connections(5)
         .acquire_timeout(std::time::Duration::from_secs(60)) // Be very patient on startup
         .idle_timeout(std::time::Duration::from_secs(30)) // Keep connections alive for reuse
         .max_lifetime(std::time::Duration::from_secs(1800)) // 30 minutes
