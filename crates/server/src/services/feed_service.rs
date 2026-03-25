@@ -3,11 +3,10 @@ use crate::{
     models::feed::{CategorizedArticle, FeedItem, NewsApiArticle, NewsApiResponse, OpenRouterCategoryResponse},
     state::AppState,
 };
-use dashmap::DashMap;
 use reqwest::Client;
 use serde_json::json;
 use sqlx::PgPool;
-use std::{sync::Arc, time::{Duration, Instant}};
+use std::{sync::Arc, time::Instant};
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
