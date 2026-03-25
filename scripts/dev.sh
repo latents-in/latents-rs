@@ -52,7 +52,7 @@ if ! kill -0 $BACKEND_PID 2>/dev/null; then
 fi
 
 echo -e "${GREEN}✅ Backend running (PID: $BACKEND_PID)${NC}"
-echo -e "${BLUE}   API: http://localhost:5000${NC}"
+echo -e "${BLUE}   API: http://localhost:8080${NC}"
 
 # Start frontend in background
 echo -e "${GREEN}⚛️  Starting frontend dev server...${NC}"
@@ -81,7 +81,7 @@ echo "========================================"
 echo -e "${GREEN}🎉 Development environment ready!${NC}"
 echo ""
 echo -e "${BLUE}Services:${NC}"
-echo "  • Backend API:  http://localhost:5000"
+echo "  • Backend API:  http://localhost:8080"
 echo "  • Frontend App: http://localhost:5173"
 echo ""
 echo -e "${BLUE}Logs:${NC}"

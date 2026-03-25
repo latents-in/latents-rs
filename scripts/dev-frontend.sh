@@ -16,7 +16,7 @@ cd crates/frontend
 
 echo -e "${GREEN}✅ Frontend hot reload enabled${NC}"
 echo -e "${BLUE}   App: http://localhost:5173${NC}"
-echo -e "${BLUE}   Proxying /api to http://localhost:5000${NC}"
+echo -e "${BLUE}   Proxying /api to http://localhost:8080${NC}"
 echo ""
 
 npm run dev

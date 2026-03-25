@@ -20,7 +20,7 @@ if ! command -v cargo-watch &> /dev/null; then
 fi
 
 echo -e "${GREEN}✅ Backend hot reload enabled${NC}"
-echo -e "${BLUE}   API: http://localhost:5000${NC}"
+echo -e "${BLUE}   API: http://localhost:8080${NC}"
 echo ""
 
 cargo watch -p latents-server -x run
