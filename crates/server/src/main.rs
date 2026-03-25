@@ -62,7 +62,7 @@ async fn main() -> anyhow::Result<()> {
     // --- Main Application Pool ---
     info!("Starting main connection pool...");
     let pool = PgPoolOptions::new()
-        .max_connections(100) // Optimal for Supabase Pooler (Transaction Mode)
+        .max_connections(50) // Scaled for 200-500 CCU
         .min_connections(5)
         .acquire_timeout(std::time::Duration::from_secs(60)) // Be very patient on startup
         .idle_timeout(std::time::Duration::from_secs(30)) // Keep connections alive for reuse
@@ -70,7 +70,7 @@ async fn main() -> anyhow::Result<()> {
         .connect_with(connect_options)
         .await?;
 
-    let state = Arc::new(AppState::new(pool));
+    let state = Arc::new(AppState::new(pool, config.news_api_keys.clone(), config.openrouter_api_keys.clone()));
 
     // CORS configuration
     let cors = CorsLayer::new()
@@ -83,6 +83,7 @@ async fn main() -> anyhow::Result<()> {
         // API routes
         .route("/api/health", get(health_check))
         .route("/api/waitlist", post(add_to_waitlist).get(get_waitlist))
+        .route("/api/feed", get(latents_server::handlers::get_feed))
         // Static files (catch-all)
         .fallback(serve_static)
         // Middleware

@@ -7,6 +7,8 @@ pub struct Config {
     pub direct_url: Option<String>,
     pub port: u16,
     pub environment: Environment,
+    pub news_api_keys: Vec<String>,
+    pub openrouter_api_keys: Vec<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,11 +39,27 @@ impl Config {
             _ => Environment::Development,
         };
 
+        let news_api_keys = env::var("NEWS_API_KEYS")
+            .unwrap_or_default()
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
+
+        let openrouter_api_keys = env::var("OPENROUTER_API_KEYS")
+            .unwrap_or_default()
+            .split(',')
+            .filter(|s| !s.trim().is_empty())
+            .map(|s| s.trim().to_string())
+            .collect();
+
         Ok(Self {
             database_url,
             direct_url,
             port,
             environment,
+            news_api_keys,
+            openrouter_api_keys,
         })
     }
 

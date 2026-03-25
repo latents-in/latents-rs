@@ -23,6 +23,7 @@ sqlx.workspace = true
 # Serialization
 serde.workspace = true
 serde_json.workspace = true
+urlencoding.workspace = true
 
 # Static file embedding
 rust-embed.workspace = true
@@ -53,6 +54,9 @@ reqwest.workspace = true
 # IP extraction
 axum-client-ip.workspace = true
 jsonwebtoken = "10.3.0"
+
+# Concurrency & Locking
+dashmap.workspace = true
 
 [lib]
 name = "latents_server"

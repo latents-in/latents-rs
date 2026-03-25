@@ -13,7 +13,8 @@
   --color-primary-900: #283445;
   --color-primary-950: #1b2330;
 
-  --font-sans: "Selecta Medium", "Selecta Medium Placeholder", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: "SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --font-display: "Selecta Medium", "Selecta Medium Placeholder", sans-serif;
 
   --animate-blob: blob 7s infinite;

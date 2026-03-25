@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import LandingPage from "./components/LandingPage";
 import WaitlistSuccess from "./components/WaitlistSuccess";
 import AdminPage from "./components/AdminPage";
+import Home from "./Home";
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
         <Route path="/" element={<><Navbar /><LandingPage /></>} />
         <Route path="/verify" element={<><Navbar /><WaitlistSuccess /></>} />
         <Route path="/admin" element={<AdminPage />} />
+        <Route path="/home" element={<Home />} />
       </Routes>
     </div>
   );

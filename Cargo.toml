@@ -27,6 +27,7 @@ sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres",
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+urlencoding = "2.1"
 
 # Static file embedding
 rust-embed = { version = "8.6", features = ["axum", "mime-guess"] }
@@ -58,6 +59,9 @@ reqwest = { version = "0.12", features = ["json"] }
 
 # IP extraction
 axum-client-ip = "1.0"
+
+# Concurrency & Locking
+dashmap = "6.1"
 
 [profile.release]
 opt-level = 3

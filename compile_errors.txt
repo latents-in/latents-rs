@@ -1,0 +1,117 @@
+    Blocking waiting for file lock on build directory
+    Checking latents-server v0.1.0 (/Users/mukundmadhav/Desktop/latents-rs/crates/server)
+error[E0432]: unresolved import `axum_client_ip::InsecureClientIp`
+ --> crates/server/src/handlers/feed.rs:7:5
+  |
+7 | use axum_client_ip::InsecureClientIp;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `InsecureClientIp` in the root
+
+warning: unused import: `ErrorResponse`
+  --> crates/server/src/handlers/feed.rs:11:23
+   |
+11 | ...r, ErrorResponse, R...
+   |       ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `dashmap::DashMap`
+ --> crates/server/src/services/feed_service.rs:6:5
+  |
+6 | use dashmap::DashMap;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `Duration`
+  --> crates/server/src/services/feed_service.rs:10:29
+   |
+10 | ...::{Duration, I...
+   |       ^^^^^^^^
+
+error[E0599]: no variant or associated item named `BadRequest` found for enum `AppError` in the current scope
+  --> crates/server/src/handlers/feed.rs:29:30
+   |
+29 | ...r::BadRequest("P...
+   |       ^^^^^^^^^^ variant or associated item not found in `AppError`
+   |
+  ::: crates/server/src/error.rs:15:1
+   |
+15 | pub enum AppError {
+   | ----------------- variant or associated item `BadRequest` not found for this enum
+
+error[E0599]: no variant or associated item named `BadRequest` found for enum `AppError` in the current scope
+  --> crates/server/src/handlers/feed.rs:33:30
+   |
+33 | ...r::BadRequest("S...
+   |       ^^^^^^^^^^ variant or associated item not found in `AppError`
+   |
+  ::: crates/server/src/error.rs:15:1
+   |
+15 | pub enum AppError {
+   | ----------------- variant or associated item `BadRequest` not found for this enum
+
+error[E0599]: no variant or associated item named `TooManyRequests` found for enum `AppError` in the current scope
+  --> crates/server/src/services/feed_service.rs:29:30
+   |
+29 | ...r::TooManyRequests("R...
+   |       ^^^^^^^^^^^^^^^ variant or associated item not found in `AppError`
+   |
+  ::: crates/server/src/error.rs:15:1
+   |
+15 | pub enum AppError {
+   | ----------------- variant or associated item `TooManyRequests` not found for this enum
+
+error[E0599]: no variant or associated item named `InternalError` found for enum `AppError` in the current scope
+   --> crates/server/src/services/feed_service.rs:152:77
+    |
+152 | ...r::InternalError(an...
+    |       ^^^^^^^^^^^^^ variant or associated item not found in `AppError`
+    |
+   ::: crates/server/src/error.rs:15:1
+    |
+ 15 | pub enum AppError {
+    | ----------------- variant or associated item `InternalError` not found for this enum
+
+error[E0433]: failed to resolve: use of unresolved module or unlinked crate `urlencoding`
+   --> crates/server/src/services/feed_service.rs:154:100
+    |
+154 | ...", urlencoding::e...
+    |       ^^^^^^^^^^^ use of unresolved module or unlinked crate `urlencoding`
+    |
+    = help: if you wanted to use a crate named `urlencoding`, use `cargo add urlencoding` to add it to your `Cargo.toml`
+
+error[E0599]: no variant or associated item named `InternalError` found for enum `AppError` in the current scope
+   --> crates/server/src/services/feed_service.rs:163:86
+    |
+163 | ...r::InternalError(an...
+    |       ^^^^^^^^^^^^^ variant or associated item not found in `AppError`
+    |
+   ::: crates/server/src/error.rs:15:1
+    |
+ 15 | pub enum AppError {
+    | ----------------- variant or associated item `InternalError` not found for this enum
+
+error[E0599]: no variant or associated item named `InternalError` found for enum `AppError` in the current scope
+   --> crates/server/src/services/feed_service.rs:205:79
+    |
+205 | ...r::InternalError(an...
+    |       ^^^^^^^^^^^^^ variant or associated item not found in `AppError`
+    |
+   ::: crates/server/src/error.rs:15:1
+    |
+ 15 | pub enum AppError {
+    | ----------------- variant or associated item `InternalError` not found for this enum
+
+error[E0599]: no variant or associated item named `InternalError` found for enum `AppError` in the current scope
+   --> crates/server/src/services/feed_service.rs:216:91
+    |
+216 | ...r::InternalError(an...
+    |       ^^^^^^^^^^^^^ variant or associated item not found in `AppError`
+    |
+   ::: crates/server/src/error.rs:15:1
+    |
+ 15 | pub enum AppError {
+    | ----------------- variant or associated item `InternalError` not found for this enum
+
+Some errors have detailed explanations: E0432, E0433, E0599.
+For more information about an error, try `rustc --explain E0432`.
+warning: `latents-server` (lib) generated 3 warnings
+error: could not compile `latents-server` (lib) due to 9 previous errors; 3 warnings emitted
