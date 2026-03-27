@@ -9,6 +9,8 @@ pub struct Config {
     pub environment: Environment,
     pub news_api_keys: Vec<String>,
     pub openrouter_api_keys: Vec<String>,
+    /// Optional Redis URL (e.g. redis://localhost:6379 or rediss://... for Upstash TLS)
+    pub redis_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,6 +55,8 @@ impl Config {
             .map(|s| s.trim().to_string())
             .collect();
 
+        let redis_url = env::var("REDIS_URL").ok();
+
         Ok(Self {
             database_url,
             direct_url,
@@ -60,6 +64,7 @@ impl Config {
             environment,
             news_api_keys,
             openrouter_api_keys,
+            redis_url,
         })
     }
 

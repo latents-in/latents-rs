@@ -1,15 +1,16 @@
 use axum::{
-    extract::{Query, State},
-    http::{StatusCode, HeaderMap},
+    extract::{Path, Query, State},
+    http::{HeaderMap, StatusCode},
     response::IntoResponse,
     Json,
 };
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::{
     error::{AppError, Result},
-    models::feed::{FeedQuery, FeedResponse},
-    services::feed_service::{get_ephemeral_feed, enforce_rate_limit},
+    models::feed::{FeedQuery, InteractQuery, InteractResponse},
+    services::feed_service::{enforce_rate_limit, get_intelligence_feed, toggle_interaction},
     state::AppState,
 };
 
@@ -23,31 +24,42 @@ pub async fn get_feed(
         .and_then(|h| h.to_str().ok())
         .map(|s| s.split(',').next().unwrap_or("").trim().to_string())
         .unwrap_or_else(|| "unknown".to_string());
-    
-    // 1. Enforce rate Limit (max 10 calls per IP per hour)
+
     enforce_rate_limit(&client_ip, &state).await?;
 
-    let page = params.page.unwrap_or(1);
-    if page < 1 {
-        return Err(AppError::BadRequest("Page must be > 0".into()));
-    }
-    
-    if params.query.trim().is_empty() {
-        return Err(AppError::BadRequest("Search query cannot be empty".into()));
+    let query = params
+        .get_query()
+        .ok_or_else(|| AppError::BadRequest("Missing query parameter ?q=".into()))?;
+
+    if query.trim().is_empty() {
+        return Err(AppError::BadRequest("Query cannot be empty".into()));
     }
 
-    // 2. Fetch the ephemeral feed (Hit or Miss)
-    let (items, total_count) = get_ephemeral_feed(params.query.clone(), page, state).await?;
-    
-    // 3. Construct response mapping exactly to structured OpenRouter format expectations
-    let has_more = (page * 20) < total_count;
-    
-    let response = FeedResponse {
-        items,
-        total: total_count,
-        page,
-        has_more,
-    };
-    
+    let page = params.page.unwrap_or(1).max(1);
+    let response = get_intelligence_feed(query, page, state).await?;
+
     Ok((StatusCode::OK, Json(response)))
+}
+
+pub async fn interact_feed(
+    State(state): State<Arc<AppState>>,
+    Path(report_id): Path<Uuid>,
+    Query(params): Query<InteractQuery>,
+) -> Result<impl IntoResponse> {
+    if params.user_id.is_empty() {
+        return Err(AppError::BadRequest("user_id is required".into()));
+    }
+
+    let (toggled_off, new_count) =
+        toggle_interaction(report_id, &params.user_id, &params.action, state).await?;
+
+    Ok((
+        StatusCode::OK,
+        Json(InteractResponse {
+            success: true,
+            action: params.action,
+            toggled_off,
+            new_count,
+        }),
+    ))
 }

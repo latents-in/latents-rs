@@ -1,595 +1,768 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import Markdown from 'react-markdown';
-import {
-  Search,
-  Inbox,
-  Calendar,
-  Users,
-  Building2,
-  Activity,
-  ArrowUpRight,
-  Info,
-  Sparkles,
-  CheckCircle2,
-  MessageSquare,
-  Send,
-  Loader2,
-  Zap,
-  MoreHorizontal,
-  Briefcase,
-  PenLine,
-  ChevronRight,
-  CornerDownLeft,
-  Clock,
-  LayoutGrid,
-  Settings,
-  Command
-} from 'lucide-react';
-import { generateChatResponse } from './lib/ai';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 
-const INITIAL_FEED = [
-  {
-    id: '1',
-    bucket: 'ground-breakers',
-    source: 'Y Combinator',
-    sourceLogo: 'https://logo.clearbit.com/ycombinator.com',
-    time: '10m ago',
-    title: 'YC S24 Late Applications Open for AI Startups',
-    summary: 'Y Combinator has quietly opened a late application window specifically for foundational AI and agentic workflows. Deadline is in 48 hours.',
-    opportunityScore: 94,
-    media: {
-      type: 'youtube',
-      url: 'https://www.youtube.com/embed/0lJKucu6WiQ?si=V-kY-88-p8j71234&controls=0',
-    },
-    action: {
-      id: 'a1',
-      type: 'apply',
-      target: 'Y Combinator',
-      title: 'Draft: YC S24 Late App',
-      draft: 'Hi YC Team,\n\nI\'m Luv, building Latents — an OS for professional opportunities. We missed the main deadline because we were heads down shipping our action-layer agent.\n\nWe have 170K distribution and are growing 20% WoW. Would love to submit a late application for S24.\n\nBest,\nLuv',
-      cta: 'Submit Application',
-      status: 'review',
-      contextInsights: [
-        "YC prefers concise, metric-driven communication.",
-        "Highlighting your 20% WoW growth is highly recommended.",
-        "Mentioning your 170K distribution shows strong traction."
-      ]
-    }
-  },
-  {
-    id: '2',
-    bucket: 'network-signals',
-    source: 'Sequoia Capital',
-    sourceLogo: 'https://logo.clearbit.com/sequoiacap.com',
-    time: '1h ago',
-    title: 'Roelof Botha is looking for agentic OS startups',
-    summary: 'Roelof mentioned on a recent podcast that Sequoia is actively looking to fund startups building the "OS for agents". This perfectly aligns with Latents.',
-    opportunityScore: 88,
-    action: {
-      id: 'a2',
-      type: 'email',
-      target: 'Sequoia Capital',
-      title: 'Draft: Seed Round Intro',
-      draft: "Hi Roelof,\n\nI'm building Latents, an OS that automates professional opportunity workflows. We're raising a $2M seed round.\n\nWe've hit $10k MRR in our first month and have strong engagement from early adopters.\n\nWould you be open to a brief chat next week?\n\nBest,\nLuv",
-      cta: 'Send Email',
-      status: 'review',
-      contextInsights: [
-        "Sequoia partners value strong early traction signals.",
-        "Keep the ask specific and low-friction."
-      ]
-    }
-  },
-  {
-    id: '3',
-    bucket: 'social-listening',
-    source: 'Twitter / X',
-    sourceLogo: 'https://logo.clearbit.com/x.com',
-    time: '2h ago',
-    title: 'Trending: #AgenticOS',
-    summary: 'The hashtag #AgenticOS is trending among tech founders. It\'s a great time to announce the Latents launch to capitalize on the momentum.',
-    opportunityScore: 75,
-    action: {
-      id: 'a3',
-      type: 'social',
-      target: 'Twitter / X',
-      title: 'Draft: Launch Announcement',
-      draft: "Just launched Latents! 🚀\n\nIt's an OS for professional opportunities. We've built an action-layer agent that drafts emails, applies to accelerators, and manages your network.\n\nCheck it out here: [link]",
-      cta: 'Post to X',
-      status: 'review',
-    }
+// ── Persistent anonymous session ID ──────────────────────────────────────────
+function getSessionId() {
+  let id = localStorage.getItem('latents_session_id');
+  if (!id) {
+    id = crypto.randomUUID();
+    localStorage.setItem('latents_session_id', id);
   }
+  return id;
+}
+
+const SESSION_ID = getSessionId();
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+// ── Micro SVG icons ───────────────────────────────────────────────────────────
+const Ic = ({ d, size = 16, fill = 'none', className = '' }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke="currentColor"
+    strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d={d} />
+  </svg>
+);
+const SearchIc = p => <Ic {...p} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />;
+const ZapIc = p => <Ic {...p} d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />;
+const GlobeIc = p => <Ic {...p} d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zm0 0c-2.76 0-5 4.48-5 10s2.24 10 5 10 5-4.48 5-10S14.76 2 12 2zM2 12h20" />;
+const BriefIc = p => <Ic {...p} d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />;
+const AlertIc = p => <Ic {...p} d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0zM12 9v4M12 17h.01" />;
+const TrendIc = p => <Ic {...p} d="M23 6l-9.5 9.5-5-5L1 18M17 6h6v6" />;
+const HeartIc = p => <Ic {...p} d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />;
+const BookmarkIc = p => <Ic {...p} d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />;
+const ShareIc = p => <Ic {...p} d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8M16 6l-4-4-4 4M12 2v13" />;
+const ArrowUpIc = p => <Ic {...p} d="M7 17L17 7M17 7H7M17 7v10" />;
+const SparkIc = p => <Ic {...p} d="M12 2l1.5 4.5H18l-3.75 2.75L15.75 14 12 11.25 8.25 14l1.5-4.75L6 6.5h4.5L12 2z" />;
+const XClose = p => <Ic {...p} d="M18 6L6 18M6 6l12 12" />;
+const ExternalIc = p => <Ic {...p} d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3" />;
+const LoadIc = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 0.8s linear infinite' }}>
+    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+  </svg>
+);
+
+// ── Intent / Risk config ──────────────────────────────────────────────────────
+const INTENT = {
+  news: { label: 'News', color: '#3B82F6', bg: '#EFF6FF', Ic: GlobeIc },
+  jobs: { label: 'Jobs', color: '#10B981', bg: '#ECFDF5', Ic: BriefIc },
+  incidents: { label: 'Incident', color: '#EF4444', bg: '#FEF2F2', Ic: AlertIc },
+  mixed: { label: 'Mixed', color: '#8B5CF6', bg: '#F5F3FF', Ic: TrendIc },
+};
+const RISK = {
+  Low: { color: '#10B981', bg: '#ECFDF5' },
+  Medium: { color: '#F59E0B', bg: '#FFFBEB' },
+  High: { color: '#EF4444', bg: '#FEF2F2' },
+  Critical: { color: '#7C3AED', bg: '#F5F3FF' },
+};
+
+// ── Pipeline stages ───────────────────────────────────────────────────────────
+const STAGES = [
+  { key: 'classify', label: 'Classifying intent…' },
+  { key: 'fetch', label: 'Aggregating sources…' },
+  { key: 'dedupe', label: 'Deduplicating…' },
+  { key: 'summarize', label: 'AI summarizing…' },
+  { key: 'cache', label: 'Storing to Supabase & cache…' },
 ];
 
-const IconButton = ({ icon: Icon, onClick, className = '' }) => (
-  <button 
-    onClick={onClick}
-    className={`w-8 h-8 flex items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors ${className}`}
-  >
-    <Icon size={16} />
-  </button>
-);
+// ─────────────────────────────────────────────────────────────────────────────
+// Feed Card
+// ─────────────────────────────────────────────────────────────────────────────
+function FeedCard({ item, selected, onSelect, onInteract }) {
+  const intent = INTENT[item.intent] || INTENT.news;
+  const risk = RISK[item.risk_level] || RISK.Medium;
+  const IntentIcon = intent.Ic;
 
-const NavItem = ({ icon: Icon, label, active, badge }) => (
-  <div className={`flex items-center justify-between px-3 py-2 rounded-md cursor-pointer transition-all duration-200 ${
-    active ? 'bg-gray-900 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-  }`}>
-    <div className="flex items-center gap-3">
-      <Icon size={16} className={active ? 'text-white' : 'text-gray-400'} />
-      <span className="text-[13px] font-medium tracking-wide">{label}</span>
-    </div>
-    {badge > 0 && (
-      <span className={`text-[11px] font-mono font-medium px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
-        active ? 'bg-white/20 text-white' : 'bg-gray-200 text-gray-600'
-      }`}>
-        {badge}
-      </span>
-    )}
-  </div>
-);
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [likeCt, setLikeCt] = useState(item.likes_count || 0);
+  const [saveCt, setSaveCt] = useState(item.saves_count || 0);
 
-export default function Home() {
-  const [items, setItems] = useState(INITIAL_FEED);
-  const [selectedId, setSelectedId] = useState(INITIAL_FEED[0].id);
-  
-  // Chat State
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatInput, setChatInput] = useState('');
-  const [messages, setMessages] = useState([
-    { role: 'model', content: "I'm monitoring your network. I've drafted 3 new actions based on recent signals." }
-  ]);
-  const [isChatLoading, setIsChatLoading] = useState(false);
-  const [isRewriting, setIsRewriting] = useState(false);
-
-  // Search State for Feed
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isFetchingFeed, setIsFetchingFeed] = useState(false);
-
-  const selectedItem = items.find(i => i.id === selectedId);
-
-  const handleUpdateDraft = (newDraft) => {
-    setItems(prev => prev.map(item => 
-      item.id === selectedId 
-        ? { ...item, action: { ...item.action, draft: newDraft } } 
-        : item
-    ));
-  };
-
-  const handleRewrite = async (instruction) => {
-    if (!selectedItem) return;
-    setIsRewriting(true);
+  const handleInteract = useCallback(async (action) => {
+    const isOn = action === 'like' ? liked : saved;
+    // Optimistic update
+    if (action === 'like') { setLiked(v => !v); setLikeCt(c => c + (isOn ? -1 : 1)); }
+    else { setSaved(v => !v); setSaveCt(c => c + (isOn ? -1 : 1)); }
     try {
-      const prompt = `Rewrite the following draft according to this instruction: "${instruction}".\n\nDraft:\n${selectedItem.action.draft}\n\nReturn ONLY the rewritten text, nothing else.`;
-      const response = await generateChatResponse(prompt, { isFast: true });
-      handleUpdateDraft(response.trim());
-    } catch (error) {
-      console.error("Rewrite failed:", error);
-    } finally {
-      setIsRewriting(false);
-    }
-  };
-
-  const handleExecute = () => {
-    if (!selectedItem) return;
-    setItems(prev => prev.map(item => 
-      item.id === selectedId 
-        ? { ...item, action: { ...item.action, status: 'done' } } 
-        : item
-    ));
-    
-    // Auto-select next pending item
-    const nextItem = items.find(i => i.id !== selectedId && i.action.status !== 'done');
-    if (nextItem) {
-      setTimeout(() => setSelectedId(nextItem.id), 300); // slight delay for animation
-    }
-  };
-
-  const handleSendMessage = async () => {
-    if (!chatInput.trim() || isChatLoading) return;
-    const userMsg = chatInput;
-    setChatInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
-    setIsChatLoading(true);
-    try {
-      const response = await generateChatResponse(userMsg);
-      setMessages(prev => [...prev, { role: 'model', content: response }]);
-    } catch (error) {
-      setMessages(prev => [...prev, { role: 'model', content: "Error processing request." }]);
-    } finally {
-      setIsChatLoading(false);
-    }
-  };
-
-  const handleFeedSearch = async (e) => {
-    e.preventDefault();
-    if (!searchQuery.trim() || isFetchingFeed) return;
-    setIsFetchingFeed(true);
-
-    try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-      const response = await fetch(`${API_URL}/api/feed?query=${encodeURIComponent(searchQuery)}&page=1`);
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
+      const res = await fetch(
+        `${API_URL}/api/feed/${item.id}/interact?user_id=${SESSION_ID}&action=${action}`,
+        { method: 'POST' }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        if (action === 'like') setLikeCt(data.new_count);
+        else setSaveCt(data.new_count);
       }
-      const data = await response.json();
-      
-      // Transform incoming FeedItems to the UI Format 
-      if (data.items && data.items.length > 0) {
-        const newFeed = data.items.map(resItem => ({
-          id: resItem.id,
-          bucket: resItem.bucket.toLowerCase().replace(' ', '-'),
-          source: 'Web Search', // We'd dynamically map real sources if possible
-          sourceLogo: 'https://logo.clearbit.com/news.ycombinator.com', 
-          time: 'Just now', // Could parse from published_at
-          title: resItem.title,
-          summary: `Automatically cached from query: ${resItem.search_query}`,
-          opportunityScore: Math.floor(Math.random() * 20) + 75,
-          action: {
-            id: `a-${resItem.id}`,
-            type: 'social',
-            target: 'Web Source',
-            title: `Read Article`,
-            draft: `Reviewing insights about: ${resItem.title}\n\nURL: ${resItem.url}`,
-            cta: 'Mark Read',
-            status: 'review'
-          }
-        }));
-        setItems(newFeed);
-        if (newFeed.length > 0) setSelectedId(newFeed[0].id);
-      } else {
-        alert("No results found for that query.");
-      }
-    } catch (err) {
-      console.error("Failed to fetch feed:", err);
-      alert("Error fetching feed. Check console.");
-    } finally {
-      setIsFetchingFeed(false);
-    }
-  };
+    } catch { /* revert on error */ }
+    onInteract?.(item.id, action);
+  }, [liked, saved, item.id, onInteract]);
 
-  const pendingCount = items.filter(i => i.action.status !== 'done').length;
+  const handleShare = () => {
+    const text = `${item.title}\n\n${item.bullets?.[0] || ''}\n\n— via Latents Intelligence OS`;
+    if (navigator.share) navigator.share({ title: item.title, text });
+    else { navigator.clipboard.writeText(text); }
+  };
 
   return (
-    <div className="flex h-screen bg-white text-gray-900 font-sans antialiased overflow-hidden selection:bg-blue-100 selection:text-blue-900">
-      
-      {/* PANE 1: Navigation Sidebar (Ultra-clean, dense) */}
-      <aside className="w-[240px] bg-[#F9FAFB] border-r border-gray-200/60 flex flex-col shrink-0 z-10">
-        {/* User / Workspace Header */}
-        <div className="h-14 flex items-center px-4 border-b border-gray-200/60">
-          <div className="flex items-center gap-2.5 w-full cursor-pointer hover:opacity-80 transition-opacity">
-            <div className="w-6 h-6 rounded bg-gradient-to-br from-gray-800 to-black flex items-center justify-center shadow-sm">
-              <Zap size={12} className="text-white fill-white" />
-            </div>
-            <span className="font-semibold text-[14px] tracking-tight">Latents OS</span>
+    <div
+      onClick={onSelect}
+      style={{
+        background: '#fff',
+        borderRadius: 16,
+        border: selected ? '1.5px solid #6366F1' : '1px solid rgba(0,0,0,0.07)',
+        boxShadow: selected
+          ? '0 0 0 3px rgba(99,102,241,0.08), 0 4px 24px rgba(0,0,0,0.06)'
+          : '0 2px 12px rgba(0,0,0,0.04)',
+        padding: '18px 20px',
+        cursor: 'pointer',
+        transition: 'all 0.18s ease',
+        marginBottom: 12,
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 10 }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {/* Intent badge */}
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: intent.color, background: intent.bg,
+            padding: '3px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4,
+            textTransform: 'uppercase', letterSpacing: '0.05em'
+          }}>
+            <IntentIcon size={10} /> {intent.label}
+          </span>
+          {/* Risk badge */}
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: risk.color, background: risk.bg,
+            padding: '3px 8px', borderRadius: 20, textTransform: 'uppercase', letterSpacing: '0.05em',
+            display: 'flex', alignItems: 'center', gap: 4
+          }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: risk.color }} />
+            {item.risk_level} Risk
+          </span>
+          {item.cache_status === 'live' && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, color: '#10B981', background: '#ECFDF5',
+              padding: '3px 8px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4
+            }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10B981', animation: 'pulse 1.5s infinite' }} />
+              LIVE
+            </span>
+          )}
+        </div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 700,
+          color: '#6366F1', background: '#EEF2FF', padding: '3px 10px', borderRadius: 20,
+          border: '1px solid rgba(99,102,241,0.15)'
+        }}>
+          <ArrowUpIc size={11} /> {item.opportunity_score}
+        </div>
+      </div>
+
+      {/* Metadata */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+        <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>
+          {item.source || 'Intelligence'}
+        </span>
+        <span style={{ color: '#cbd5e1', fontSize: 12 }}>·</span>
+        <span style={{ fontSize: 12, color: '#9CA3AF' }}>{item.published_at}</span>
+        <span style={{ color: '#cbd5e1', fontSize: 12 }}>·</span>
+        <span style={{ fontSize: 12, color: '#9CA3AF' }}>{item.source_count} sources</span>
+      </div>
+
+      {/* Title */}
+      <h3 style={{ fontSize: 15, fontWeight: 700, color: '#0F172A', lineHeight: 1.45, margin: '0 0 10px' }}>
+        {item.title}
+      </h3>
+
+      {/* Regions */}
+      {item.regions?.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 10 }}>
+          {item.regions.slice(0, 4).map(r => (
+            <span key={r} style={{
+              fontSize: 11, color: '#6B7280', background: '#F3F4F6',
+              padding: '2px 8px', borderRadius: 20, border: '1px solid #E5E7EB'
+            }}>
+              🌍 {r}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Bullets */}
+      <ul style={{ margin: '0 0 10px', paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {(item.bullets || []).slice(0, selected ? 99 : 2).map((b, i) => (
+          <li key={i} style={{ fontSize: 13, color: '#374151', lineHeight: 1.55, display: 'flex', gap: 10 }}>
+            <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#6366F1', marginTop: 7, flexShrink: 0 }} />
+            {b}
+          </li>
+        ))}
+        {!selected && (item.bullets || []).length > 2 && (
+          <li style={{ fontSize: 12, color: '#9CA3AF', marginLeft: 15, fontWeight: 500 }}>
+            +{item.bullets.length - 2} more…
+          </li>
+        )}
+      </ul>
+
+      {/* Why it matters — only when selected */}
+      {selected && item.why_it_matters && (
+        <div style={{
+          background: 'linear-gradient(135deg,#F8FAFF,#FAFBFF)', border: '1px solid rgba(99,102,241,0.12)',
+          borderRadius: 12, padding: '12px 14px', marginBottom: 12
+        }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, color: '#6366F1', textTransform: 'uppercase',
+            letterSpacing: '0.07em', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 5
+          }}>
+            <SparkIc size={10} /> Why This Matters
+          </div>
+          <p style={{ fontSize: 13, color: '#374151', lineHeight: 1.6, margin: 0 }}>
+            {item.why_it_matters}
+          </p>
+        </div>
+      )}
+
+      {/* Source articles — only when selected */}
+      {selected && item.articles?.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+            Source Articles
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {item.articles.slice(0, 3).map((a, i) => (
+              <a key={i} href={a.url} target="_blank" rel="noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#374151',
+                  textDecoration: 'none', padding: '8px 10px', background: '#F8F9FC', borderRadius: 8,
+                  border: '1px solid rgba(0,0,0,0.05)'
+                }}>
+                <ExternalIc size={12} style={{ color: '#9CA3AF', flexShrink: 0 }} />
+                <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {a.title}
+                </span>
+                <span style={{ fontSize: 11, color: '#9CA3AF', flexShrink: 0 }}>{a.source}</span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Footer: Like / Save / Share */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        paddingTop: 10, borderTop: '1px solid #F1F5F9', marginTop: 4
+      }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {/* Like */}
+          <button onClick={e => { e.stopPropagation(); handleInteract('like'); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 20,
+              border: 'none', background: liked ? '#FEF2F2' : 'transparent', cursor: 'pointer',
+              color: liked ? '#EF4444' : '#9CA3AF', fontSize: 12, fontWeight: 500, transition: 'all 0.15s'
+            }}>
+            <HeartIc size={14} fill={liked ? '#EF4444' : 'none'} />
+            {likeCt > 0 && likeCt}
+          </button>
+          {/* Save */}
+          <button onClick={e => { e.stopPropagation(); handleInteract('save'); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 20,
+              border: 'none', background: saved ? '#EEF2FF' : 'transparent', cursor: 'pointer',
+              color: saved ? '#6366F1' : '#9CA3AF', fontSize: 12, fontWeight: 500, transition: 'all 0.15s'
+            }}>
+            <BookmarkIc size={14} fill={saved ? '#6366F1' : 'none'} />
+            {saveCt > 0 && saveCt}
+          </button>
+          {/* Share */}
+          <button onClick={e => { e.stopPropagation(); handleShare(); }}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 5, padding: '5px 10px', borderRadius: 20,
+              border: 'none', background: 'transparent', cursor: 'pointer',
+              color: '#9CA3AF', fontSize: 12, fontWeight: 500, transition: 'all 0.15s'
+            }}>
+            <ShareIc size={14} /> Share
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <div style={{
+            width: 18, height: 18, borderRadius: 5, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <ZapIc size={9} style={{ color: '#fff' }} />
+          </div>
+          <span style={{ fontSize: 11, color: '#9CA3AF' }}>AI-curated</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ─────────────────────────────────────────────────────────────────────────────
+export default function Home() {
+  const [feed, setFeed] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [query, setQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [stageIdx, setStageIdx] = useState(-1);
+  const [error, setError] = useState(null);
+  const [filter, setFilter] = useState('all');
+  const [searched, setSearched] = useState(false); // has the user searched at least once?
+  const stageTimer = useRef(null);
+  const inputRef = useRef(null);
+
+  // Focus input on mount
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  // Cycle through pipeline stages during fetch
+  const startPipelineAnim = () => {
+    setStageIdx(0);
+    let i = 0;
+    stageTimer.current = setInterval(() => {
+      i++;
+      if (i >= STAGES.length) { clearInterval(stageTimer.current); }
+      else setStageIdx(i);
+    }, 600);
+  };
+  const stopPipelineAnim = () => {
+    clearInterval(stageTimer.current);
+    setStageIdx(-1);
+  };
+
+  const handleSearch = async (e) => {
+    e?.preventDefault();
+    if (!query.trim() || loading) return;
+    setLoading(true);
+    setError(null);
+    setSearched(true);
+    startPipelineAnim();
+
+    try {
+      const res = await fetch(
+        `${API_URL}/api/feed?query=${encodeURIComponent(query.trim())}&page=1`
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || `Server error ${res.status}`);
+      }
+      const data = await res.json();
+      if (data.items && data.items.length > 0) {
+        // Prepend new results to feed
+        setFeed(prev => {
+          const existingIds = new Set(prev.map(i => i.id));
+          const fresh = data.items.filter(i => !existingIds.has(i.id));
+          return [...fresh, ...prev];
+        });
+        setSelected(data.items[0].id);
+      } else {
+        setError('No intelligence found for that query. Try a different topic.');
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to fetch intelligence. Please try again.');
+    } finally {
+      stopPipelineAnim();
+      setLoading(false);
+      setQuery('');
+    }
+  };
+
+  const filtered = filter === 'all' ? feed : feed.filter(i => i.intent === filter);
+
+  const FILTERS = [
+    { key: 'all', label: 'All' },
+    { key: 'news', label: 'News' },
+    { key: 'incidents', label: 'Incidents' },
+    { key: 'jobs', label: 'Jobs' },
+  ];
+
+  return (
+    <div style={{
+      display: 'flex', height: '100vh', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif',
+      background: '#F8F9FC', color: '#0F172A', overflow: 'hidden'
+    }}>
+
+      {/* ── SIDEBAR ─────────────────────────────────────────────────────────── */}
+      <aside style={{
+        width: 220, background: '#fff', borderRight: '1px solid rgba(0,0,0,0.07)',
+        display: 'flex', flexDirection: 'column', flexShrink: 0
+      }}>
+        {/* Logo */}
+        <div style={{
+          height: 56, display: 'flex', alignItems: 'center', paddingLeft: 16, paddingRight: 16,
+          borderBottom: '1px solid rgba(0,0,0,0.06)', gap: 10
+        }}>
+          <div style={{
+            width: 28, height: 28, borderRadius: 8, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
+          }}>
+            <ZapIc size={14} style={{ color: '#fff' }} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 800, fontSize: 14, letterSpacing: '-0.02em' }}>Latents</div>
+            <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 500 }}>Intelligence OS</div>
           </div>
         </div>
 
-        {/* Navigation */}
-        <div className="p-3 flex-1 overflow-y-auto">
-          <div className="space-y-0.5 mb-6">
-            <NavItem icon={Inbox} label="Inbox" active={true} badge={pendingCount} />
-            <NavItem icon={Search} label="Search" />
-            <NavItem icon={Calendar} label="Schedule" />
+        {/* Filters as nav */}
+        <nav style={{ padding: '12px 10px', flex: 1 }}>
+          <div style={{
+            fontSize: 9, fontWeight: 700, color: '#CBD5E1', textTransform: 'uppercase',
+            letterSpacing: '0.1em', padding: '0 12px', marginBottom: 8
+          }}>
+            Signal Type
           </div>
+          {FILTERS.map(f => {
+            const count = f.key === 'all' ? feed.length : feed.filter(i => i.intent === f.key).length;
+            return (
+              <div key={f.key} onClick={() => setFilter(f.key)}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '8px 12px', borderRadius: 8, cursor: 'pointer', marginBottom: 2,
+                  background: filter === f.key ? '#6366F1' : 'transparent',
+                  color: filter === f.key ? '#fff' : '#6B7280',
+                  fontWeight: filter === f.key ? 600 : 500, fontSize: 13, transition: 'all 0.15s'
+                }}
+                onMouseEnter={e => { if (filter !== f.key) e.currentTarget.style.background = '#F3F4F6'; }}
+                onMouseLeave={e => { if (filter !== f.key) e.currentTarget.style.background = 'transparent'; }}>
+                <span>{f.label}</span>
+                {count > 0 && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, minWidth: 18, textAlign: 'center', padding: '1px 6px', borderRadius: 20,
+                    background: filter === f.key ? 'rgba(255,255,255,0.25)' : '#EEF2FF',
+                    color: filter === f.key ? '#fff' : '#6366F1'
+                  }}>
+                    {count}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </nav>
 
-          <div className="mb-6">
-            <h4 className="px-3 text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Network</h4>
-            <div className="space-y-0.5">
-              <NavItem icon={Users} label="People" />
-              <NavItem icon={Building2} label="Companies" />
-              <NavItem icon={Activity} label="Signals" />
+        {/* Pipeline status */}
+        <div style={{ padding: '12px 16px', borderTop: '1px solid rgba(0,0,0,0.05)', background: '#FAFBFF' }}>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 8 }}>
+            Pipeline
+          </div>
+          {['Intent Classifier', 'Aggregator', 'AI Summarizer', stageIdx >= 4 ? 'Cached ✓' : 'Redis Cache'].map((label, i) => (
+            <div key={label} style={{
+              display: 'flex', alignItems: 'center', gap: 6, fontSize: 11,
+              color: (!loading || stageIdx >= i) ? '#10B981' : '#9CA3AF', fontWeight: 500, marginBottom: 5
+            }}>
+              {(!loading || stageIdx >= i)
+                ? <span style={{
+                  width: 6, height: 6, borderRadius: '50%', background: '#10B981',
+                  boxShadow: '0 0 0 2px rgba(16,185,129,0.15)', animation: loading && stageIdx === i ? 'pulse 1s infinite' : 'none'
+                }} />
+                : <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#E5E7EB' }} />
+              }
+              {label}
             </div>
-          </div>
-        </div>
-
-        {/* Footer */}
-        <div className="p-3 border-t border-gray-200/60">
-          <div className="flex items-center gap-3 px-3 py-2 text-gray-500 hover:text-gray-900 cursor-pointer rounded-md hover:bg-gray-100 transition-colors">
-            <Settings size={16} />
-            <span className="text-[13px] font-medium">Settings</span>
-          </div>
+          ))}
         </div>
       </aside>
 
-      {/* PANE 2: The Twitter-like Feed (Infinite Scroll) */}
-      <main className="flex-1 overflow-y-auto bg-[#F4F5F7] relative">
-        <div className="max-w-2xl mx-auto py-10 px-6 space-y-6">
-          <div className="mb-8">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Opportunities Feed</h1>
-            <p className="text-gray-500 text-[14px] mt-1">Your personalized stream of actionable signals.</p>
-            
-            <form onSubmit={handleFeedSearch} className="mt-6 flex gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                <input 
-                  type="text" 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Ask for custom feed signals (e.g. space x)"
-                  className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm"
-                />
+      {/* ── FEED ────────────────────────────────────────────────────────────── */}
+      <main style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Top bar */}
+        <header style={{
+          position: 'sticky', top: 0, background: 'rgba(248,249,252,0.92)',
+          backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(0,0,0,0.06)',
+          padding: '0 24px', height: 56, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', zIndex: 20
+        }}>
+          <h1 style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.02em', margin: 0 }}>
+            Intelligence Feed
+          </h1>
+          {/* Pipeline stage indicator */}
+          {loading && stageIdx >= 0 && (
+            <span style={{
+              fontSize: 11, color: '#8B5CF6', fontWeight: 500,
+              display: 'flex', alignItems: 'center', gap: 6
+            }}>
+              <LoadIc size={12} />
+              {STAGES[stageIdx]?.label}
+            </span>
+          )}
+          {/* Search bar */}
+          <form onSubmit={handleSearch} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ position: 'relative' }}>
+              <SearchIc size={14} style={{
+                position: 'absolute', left: 10, top: '50%',
+                transform: 'translateY(-50%)', color: '#9CA3AF', pointerEvents: 'none'
+              }} />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={e => setQuery(e.target.value)}
+                placeholder="e.g. China chip war, AI jobs India…"
+                style={{
+                  width: 300, paddingLeft: 32, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
+                  fontSize: 13, borderRadius: 10, border: '1.5px solid #E5E7EB', background: '#fff',
+                  color: '#111', outline: 'none', transition: 'all 0.15s',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                }}
+                onFocus={e => { e.target.style.borderColor = '#6366F1'; e.target.style.boxShadow = '0 0 0 3px rgba(99,102,241,0.1)'; }}
+                onBlur={e => { e.target.style.borderColor = '#E5E7EB'; e.target.style.boxShadow = '0 1px 4px rgba(0,0,0,0.04)'; }}
+              />
+            </div>
+            <button type="submit" disabled={loading || !query.trim()}
+              style={{
+                padding: '8px 18px', fontSize: 13, fontWeight: 600, borderRadius: 10, border: 'none',
+                background: loading || !query.trim() ? '#C7D2FE' : 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                color: '#fff', cursor: loading || !query.trim() ? 'not-allowed' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+                boxShadow: loading ? 'none' : '0 2px 8px rgba(99,102,241,0.3)', transition: 'all 0.15s'
+              }}>
+              {loading ? <LoadIc size={14} /> : <SearchIc size={14} />}
+              {loading ? 'Analyzing…' : 'Search'}
+            </button>
+          </form>
+        </header>
+
+        {/* Body */}
+        <div style={{ padding: '24px', maxWidth: 760, width: '100%', margin: '0 auto', flex: 1 }}>
+
+          {/* ── Empty State ───────────────────────────────────────────────── */}
+          {!searched && feed.length === 0 && (
+            <div style={{
+              height: '100%', minHeight: 500, display: 'flex', flexDirection: 'column',
+              alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '0 32px'
+            }}>
+              <div style={{
+                width: 72, height: 72, borderRadius: 20, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 20,
+                boxShadow: '0 8px 32px rgba(99,102,241,0.3)'
+              }}>
+                <SparkIc size={32} style={{ color: '#fff' }} />
               </div>
-              <button 
-                type="submit" 
-                disabled={isFetchingFeed}
-                className="bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
-              >
-                {isFetchingFeed ? <Loader2 size={16} className="animate-spin" /> : "Fetch"}
+              <h2 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.03em', margin: '0 0 12px', color: '#0F172A' }}>
+                What's happening in your world?
+              </h2>
+              <p style={{ fontSize: 15, color: '#6B7280', lineHeight: 1.6, maxWidth: 420, margin: '0 0 24px' }}>
+                Search any topic — geopolitics, markets, tech, jobs, incidents — and get an AI-curated situation report in seconds.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 32 }}>
+                {['War in Ukraine', 'AI jobs India', 'China chip ban', 'Stock market crash', 'Cybersecurity breach'].map(s => (
+                  <button key={s} onClick={() => { setQuery(s); setTimeout(() => handleSearch(), 50); }}
+                    style={{
+                      fontSize: 13, fontWeight: 500, padding: '8px 16px', borderRadius: 20,
+                      border: '1.5px solid #E5E7EB', background: '#fff', color: '#374151', cursor: 'pointer',
+                      transition: 'all 0.15s', boxShadow: '0 1px 4px rgba(0,0,0,0.04)'
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = '#6366F1'; e.currentTarget.style.color = '#6366F1'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = '#E5E7EB'; e.currentTarget.style.color = '#374151'; }}>
+                    {s}
+                  </button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', gap: 24, fontSize: 12, color: '#9CA3AF' }}>
+                {['Intent Classification', 'NewsAPI Aggregation', 'AI Situation Report', 'Supabase Cached'].map(f => (
+                  <span key={f} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#10B981' }} /> {f}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Loading skeleton ──────────────────────────────────────────── */}
+          {loading && (
+            <div style={{ background: '#fff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.07)', padding: '20px', marginBottom: 12 }}>
+              <div style={{
+                height: 12, background: 'linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)',
+                backgroundSize: '200% 100%', borderRadius: 8, marginBottom: 12, animation: 'shimmer 1.5s infinite'
+              }} />
+              <div style={{
+                height: 20, background: 'linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)',
+                backgroundSize: '200% 100%', borderRadius: 8, marginBottom: 10, width: '80%', animation: 'shimmer 1.5s infinite'
+              }} />
+              {[1, 2, 3].map(i => (
+                <div key={i} style={{
+                  height: 12, background: 'linear-gradient(90deg,#F1F5F9 25%,#E2E8F0 50%,#F1F5F9 75%)',
+                  backgroundSize: '200% 100%', borderRadius: 8, marginBottom: 8, width: `${85 - i * 10}%`,
+                  animation: 'shimmer 1.5s infinite'
+                }} />
+              ))}
+            </div>
+          )}
+
+          {/* ── Error State ───────────────────────────────────────────────── */}
+          {error && (
+            <div style={{
+              background: '#FEF2F2', border: '1px solid rgba(239,68,68,0.2)', borderRadius: 12,
+              padding: '14px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <AlertIc size={16} style={{ color: '#EF4444', flexShrink: 0 }} />
+                <span style={{ fontSize: 13, color: '#991B1B', fontWeight: 500 }}>{error}</span>
+              </div>
+              <button onClick={() => setError(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF' }}>
+                <XClose size={14} />
               </button>
-            </form>
-          </div>
+            </div>
+          )}
 
-          <AnimatePresence initial={false}>
-            {items.map((item) => {
-              const isSelected = item.id === selectedId;
-              const isDone = item.action.status === 'done';
+          {/* ── Stats bar ────────────────────────────────────────────────── */}
+          {feed.length > 0 && (
+            <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
+              {[
+                { label: 'Signals', value: feed.length, color: '#6366F1' },
+                { label: 'High Risk', value: feed.filter(i => ['High', 'Critical'].includes(i.risk_level)).length, color: '#EF4444' },
+                { label: 'Regions', value: [...new Set(feed.flatMap(i => i.regions || []))].length, color: '#10B981' },
+                { label: 'Live', value: feed.filter(i => i.cache_status === 'live').length, color: '#F59E0B' },
+              ].map(s => (
+                <div key={s.label} style={{
+                  flex: 1, background: '#fff', borderRadius: 12,
+                  padding: '10px 14px', border: '1px solid rgba(0,0,0,0.06)', boxShadow: '0 1px 4px rgba(0,0,0,0.03)'
+                }}>
+                  <div style={{ fontSize: 22, fontWeight: 800, color: s.color, lineHeight: 1 }}>{s.value}</div>
+                  <div style={{ fontSize: 11, color: '#9CA3AF', fontWeight: 500, marginTop: 4 }}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+          )}
 
-              return (
-                <motion.div
-                  key={item.id}
-                  layout
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  onClick={() => setSelectedId(item.id)}
-                  className={`bg-white rounded-2xl p-6 border transition-all duration-200 cursor-pointer ${
-                    isSelected ? 'border-blue-500 shadow-md ring-1 ring-blue-500/20' : 'border-gray-200 shadow-sm hover:shadow-md hover:border-gray-300'
-                  } ${isDone ? 'opacity-60 grayscale' : ''}`}
-                >
-                  {/* Feed Card Content */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <img src={item.sourceLogo} alt="" className="w-10 h-10 rounded-full border border-gray-100 object-contain p-1" />
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-semibold text-[15px] text-gray-900">{item.source}</span>
-                          <span className="text-[13px] text-gray-400 font-mono">{item.time}</span>
-                        </div>
-                        <span className="text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full uppercase tracking-wider mt-0.5 inline-block">
-                          {item.bucket.replace('-', ' ')}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 text-[12px] font-mono font-medium text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
-                      <ArrowUpRight size={12} />
-                      Score: {item.opportunityScore}
-                    </div>
-                  </div>
+          {/* ── Feed Cards ───────────────────────────────────────────────── */}
+          {searched && feed.length === 0 && !loading && !error && (
+            <div style={{ textAlign: 'center', padding: '60px 0', color: '#9CA3AF' }}>
+              <GlobeIc size={32} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
+              <p style={{ fontSize: 14, fontWeight: 500 }}>No results. Try a more specific topic.</p>
+            </div>
+          )}
 
-                  <h3 className="text-[18px] font-semibold text-gray-900 mb-2 leading-snug">{item.title}</h3>
-                  <p className="text-[15px] text-gray-600 leading-relaxed mb-4">{item.summary}</p>
-
-                  {item.media && item.media.type === 'youtube' && (
-                    <div className="relative w-full aspect-video rounded-xl overflow-hidden border border-gray-200 mb-4">
-                      <iframe
-                        title="Embedded media"
-                        src={item.media.url}
-                        className="absolute inset-0 w-full h-full"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        allowFullScreen
-                      />
-                    </div>
-                  )}
-
-                  <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
-                        <Zap size={12} className="text-white fill-white" />
-                      </div>
-                      <span className="text-[14px] font-medium text-gray-700">Latents drafted an action</span>
-                    </div>
-                    <button
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-medium transition-colors ${
-                        isSelected ? 'bg-blue-50 text-blue-700' : 'bg-gray-900 text-white hover:bg-gray-800'
-                      }`}
-                    >
-                      {isSelected ? 'Reviewing Draft →' : 'Review Draft'}
-                    </button>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
+          {filtered.map(item => (
+            <FeedCard
+              key={item.id}
+              item={item}
+              selected={item.id === selected}
+              onSelect={() => setSelected(s => s === item.id ? null : item.id)}
+              onInteract={() => { }}
+            />
+          ))}
         </div>
       </main>
 
-      {/* PANE 3: Action Center Detail (Right Sidebar) */}
-      <aside className="w-[480px] bg-white border-l border-gray-200/60 flex flex-col shrink-0 relative shadow-2xl z-20">
-        {selectedItem ? (
-          <>
-            {/* Detail Header */}
-            <header className="h-16 flex items-center justify-between px-6 border-b border-gray-200/60 shrink-0 bg-white">
-              <div className="flex items-center gap-2 text-[14px] text-gray-500 font-medium">
-                <span className="text-gray-900 font-semibold">Action Center</span>
-                <ChevronRight size={14} className="text-gray-300" />
-                <span className="text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">{selectedItem.action.target}</span>
+      {/* ── DETAIL PANEL ─────────────────────────────────────────────────────── */}
+      {selected && (() => {
+        const item = feed.find(i => i.id === selected);
+        if (!item) return null;
+        const risk = RISK[item.risk_level] || RISK.Medium;
+        return (
+          <aside style={{
+            width: 360, background: '#fff', borderLeft: '1px solid rgba(0,0,0,0.07)',
+            display: 'flex', flexDirection: 'column', flexShrink: 0, overflowY: 'auto'
+          }}>
+            {/* Header */}
+            <div style={{
+              height: 56, borderBottom: '1px solid rgba(0,0,0,0.06)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '0 18px', flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <SparkIc size={14} style={{ color: '#6366F1' }} />
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Situation Report</span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setIsChatOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md text-[12px] font-medium transition-colors"
-                >
-                  <MessageSquare size={14} />
-                  Ask Agent
-                </button>
-              </div>
-            </header>
-
-            {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto bg-white">
-              <div className="p-6 space-y-6">
-
-                {/* Target Insights */}
-                {selectedItem.action.contextInsights && (
-                  <div className="space-y-3">
-                    <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                      <Info size={12} /> Agent Insights
-                    </h4>
-                    <div className="bg-blue-50/50 rounded-xl p-4 border border-blue-100/50">
-                      <ul className="space-y-2">
-                        {selectedItem.action.contextInsights.map((insight, idx) => (
-                          <li key={idx} className="text-[13px] text-blue-900/80 flex items-start gap-2.5 leading-relaxed">
-                            <span className="w-1 h-1 rounded-full bg-blue-400 mt-2 shrink-0" />
-                            {insight}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                )}
-
-                {/* The Execution Draft */}
-                <div className="space-y-3 pb-24">
-                  <h4 className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                    <PenLine size={12} /> {selectedItem.action.title}
-                  </h4>
-
-                  <div className="relative group">
-                    {isRewriting && (
-                      <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] rounded-xl flex items-center justify-center z-10 border border-transparent">
-                        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100">
-                          <Loader2 size={14} className="text-blue-500 animate-spin" />
-                          <span className="text-[13px] font-medium text-gray-600">Rewriting...</span>
-                        </div>
-                      </div>
-                    )}
-
-                    <textarea
-                      className="w-full min-h-[400px] bg-[#F9FAFB] text-[15px] text-gray-900 leading-relaxed resize-none p-6 rounded-xl border border-gray-200/80 shadow-inner focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500/30 transition-all"
-                      value={selectedItem.action.draft}
-                      onChange={(e) => handleUpdateDraft(e.target.value)}
-                      spellCheck={false}
-                      disabled={selectedItem.action.status === 'done' || isRewriting}
-                    />
-
-                    {/* AI Quick Actions (Inside Editor Bottom) */}
-                    {selectedItem.action.status !== 'done' && (
-                      <div className="absolute bottom-4 left-6 right-6 flex flex-wrap gap-2 opacity-0 group-focus-within:opacity-100 hover:opacity-100 transition-opacity duration-200">
-                        <button onClick={() => handleRewrite("Make it punchier and more concise")} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[12px] font-medium transition-colors border border-gray-200 shadow-sm">
-                          <Sparkles size={12} className="text-purple-500" /> Punchier
-                        </button>
-                        <button onClick={() => handleRewrite("Add traction metrics")} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[12px] font-medium transition-colors border border-gray-200 shadow-sm">
-                          <Sparkles size={12} className="text-purple-500" /> Metrics
-                        </button>
-                        <button onClick={() => handleRewrite("Improve professional tone")} className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 rounded-full text-[12px] font-medium transition-colors border border-gray-200 shadow-sm">
-                          <Sparkles size={12} className="text-purple-500" /> Pro tone
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-            </div>
-
-            {/* Fixed Bottom Action Bar */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-gray-200/60 flex items-center justify-between z-20">
-              <div className="flex items-center gap-2">
-                <span className="text-[12px] text-gray-400 font-mono">
-                  Last edited just now
-                </span>
-              </div>
-
-              {selectedItem.action.status === 'done' ? (
-                <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-md text-[13px] font-medium border border-emerald-100/50">
-                  <CheckCircle2 size={16} />
-                  Executed Successfully
-                </div>
-              ) : (
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={handleExecute}
-                    className="bg-[#0F172A] hover:bg-black text-white px-6 py-2.5 rounded-lg text-[14px] font-medium transition-all shadow-md flex items-center gap-2 active:scale-[0.98]"
-                  >
-                    {selectedItem.action.cta}
-                    <div className="flex items-center gap-0.5 ml-1 opacity-50">
-                      <Command size={12} />
-                      <CornerDownLeft size={12} />
-                    </div>
-                  </button>
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-gray-400 space-y-4">
-            <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100">
-              <CheckCircle2 size={24} className="text-gray-300" />
-            </div>
-            <p className="text-[14px] font-medium">Inbox Zero. All actions executed.</p>
-          </div>
-        )}
-      </aside>
-
-      {/* Floating Chat Panel (Overlay) */}
-      <AnimatePresence>
-        {isChatOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="absolute bottom-6 right-[504px] w-[360px] bg-white rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-gray-200/60 overflow-hidden flex flex-col z-50"
-            style={{ height: '480px' }}
-          >
-            <div className="h-12 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between px-4">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 rounded bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
-                  <Zap size={10} className="text-white fill-white" />
-                </div>
-                <span className="font-semibold text-[13px] text-gray-900">Agent</span>
-              </div>
-              <button onClick={() => setIsChatOpen(false)} className="text-gray-400 hover:text-gray-900 transition-colors">
-                <ChevronRight size={16} className="rotate-90" />
+              <button onClick={() => setSelected(null)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9CA3AF', padding: 4 }}>
+                <XClose size={14} />
               </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-white">
-              {messages.map((msg, idx) => (
-                <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[85%] rounded-xl px-3.5 py-2.5 text-[13px] leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-500 text-white rounded-br-sm' 
-                      : 'bg-[#F9FAFB] border border-gray-100 text-gray-900 rounded-bl-sm'
-                  }`}>
-                    <Markdown className="prose prose-sm max-w-none dark:prose-invert">
-                      {msg.content}
-                    </Markdown>
+            <div style={{ padding: 18, flex: 1 }}>
+              {/* Risk */}
+              <div style={{
+                background: risk.bg, border: `1px solid ${risk.color}22`, borderRadius: 12,
+                padding: '10px 14px', marginBottom: 16, display: 'flex', gap: 10
+              }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: risk.color, flexShrink: 0, marginTop: 3 }} />
+                <div>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: risk.color, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    {item.risk_level} Risk
+                  </div>
+                  <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>
+                    {(item.regions || []).join(' · ') || 'Global'}
                   </div>
                 </div>
-              ))}
-              {isChatLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-[#F9FAFB] border border-gray-100 rounded-xl rounded-bl-sm px-4 py-3">
-                    <Loader2 size={14} className="text-gray-400 animate-spin" />
+              </div>
+
+              {/* Title */}
+              <h2 style={{ fontSize: 16, fontWeight: 800, lineHeight: 1.4, color: '#0F172A', margin: '0 0 14px' }}>
+                {item.title}
+              </h2>
+
+              {/* Bullets */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+                  Key Updates
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {(item.bullets || []).map((b, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 10, fontSize: 13, color: '#374151', lineHeight: 1.5 }}>
+                      <span style={{
+                        minWidth: 20, height: 20, borderRadius: '50%',
+                        background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', color: '#fff',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 9, fontWeight: 700, flexShrink: 0, marginTop: 1
+                      }}>
+                        {i + 1}
+                      </span>
+                      {b}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Why it matters */}
+              {item.why_it_matters && (
+                <div style={{
+                  background: 'linear-gradient(135deg,#F5F3FF,#F8F9FF)',
+                  border: '1px solid rgba(99,102,241,0.2)', borderRadius: 12, padding: 14, marginBottom: 16
+                }}>
+                  <div style={{
+                    fontSize: 10, fontWeight: 700, color: '#6366F1', textTransform: 'uppercase',
+                    letterSpacing: '0.08em', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 5
+                  }}>
+                    <SparkIc size={10} /> Why This Matters
                   </div>
+                  <p style={{ fontSize: 13, color: '#4C1D95', lineHeight: 1.65, margin: 0 }}>
+                    {item.why_it_matters}
+                  </p>
                 </div>
               )}
-            </div>
 
-            <div className="p-3 border-t border-gray-100 bg-white">
-              <div className="relative flex items-center">
-                <input 
-                  type="text"
-                  value={chatInput}
-                  onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Ask agent to draft..."
-                  className="w-full bg-[#F9FAFB] border border-gray-200/60 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-lg pl-3 pr-10 py-2 text-[13px] outline-none transition-all"
-                />
-                <button 
-                  onClick={handleSendMessage}
-                  disabled={!chatInput.trim() || isChatLoading}
-                  className="absolute right-1.5 w-6 h-6 flex items-center justify-center bg-blue-500 text-white rounded-md disabled:opacity-50 disabled:bg-gray-300 transition-colors"
-                >
-                  <Send size={12} className="ml-0.5" />
-                </button>
+              {/* Pipeline metadata */}
+              <div style={{ borderTop: '1px solid rgba(0,0,0,0.05)', paddingTop: 14 }}>
+                <div style={{ fontSize: 9, fontWeight: 700, color: '#CBD5E1', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+                  Pipeline Metadata
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {[
+                    { label: 'Intent', value: item.intent },
+                    { label: 'Risk', value: item.risk_level },
+                    { label: 'Cache', value: item.cache_status === 'live' ? '🟢 Live' : item.cache_status === 'redis' ? '⚡ Redis' : '🔵 DB' },
+                    { label: 'Score', value: item.opportunity_score },
+                    { label: 'Sources', value: item.source_count },
+                  ].map(m => (
+                    <div key={m.label} style={{ background: '#F8F9FC', borderRadius: 8, padding: '8px 10px', border: '1px solid rgba(0,0,0,0.05)' }}>
+                      <div style={{ fontSize: 9, color: '#9CA3AF', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{m.label}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginTop: 2, textTransform: 'capitalize' }}>{m.value}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          </aside>
+        );
+      })()}
 
+      {/* Global keyframes */}
+      <style>{`
+        @keyframes spin    { to { transform: rotate(360deg); } }
+        @keyframes pulse   { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+        *::-webkit-scrollbar { width: 4px; }
+        *::-webkit-scrollbar-track { background: transparent; }
+        *::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 4px; }
+      `}</style>
     </div>
   );
 }

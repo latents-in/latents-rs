@@ -57,6 +57,8 @@ jsonwebtoken = "10.3.0"
 
 # Concurrency & Locking
 dashmap.workspace = true
+redis.workspace = true
+md5.workspace = true
 
 [lib]
 name = "latents_server"
