@@ -13,7 +13,7 @@ use sqlx::types::Json;
 use std::{
     collections::HashSet,
     sync::Arc,
-    time::Instant,
+    time::{Duration, Instant},
 };
 use tokio::sync::Mutex;
 use tracing::{error, info, warn};
@@ -532,7 +532,7 @@ Return ONLY valid JSON:
         )));
     }
 
-    let data: serde_json::Value = res.json().await?;
+    let data: serde_json::Value = res.json().await.map_err(|e| AppError::InternalError(anyhow::anyhow!("OpenRouter classify JSON parse: {e}")))?;
     let content = data["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("{}");
@@ -670,7 +670,7 @@ Rules:
             .await
         {
             Ok(res) if res.status().is_success() => {
-                let data: serde_json::Value = res.json().await?;
+                let data: serde_json::Value = res.json().await.map_err(|e| AppError::InternalError(anyhow::anyhow!("OpenRouter summarize JSON parse: {e}")))?;
                 let content = data["choices"][0]["message"]["content"]
                     .as_str()
                     .unwrap_or("{}");

@@ -61,7 +61,7 @@ async fn main() -> anyhow::Result<()> {
         .connect_with(migration_options)
         .await?;
 
-    sqlx::migrate!("./migrations").run(&migration_pool).await?;
+    sqlx::migrate!("./migrations").set_ignore_missing(true).run(&migration_pool).await?;
     migration_pool.close().await;
     info!("Migrations completed successfully");
 
@@ -119,7 +119,7 @@ async fn main() -> anyhow::Result<()> {
         .route("/api/waitlist", post(add_to_waitlist).get(get_waitlist))
         .route("/api/feed", get(latents_server::handlers::get_feed))
         .route(
-            "/api/feed/:id/interact",
+            "/api/feed/{id}/interact",
             post(latents_server::handlers::interact_feed),
         )
         .fallback(serve_static)

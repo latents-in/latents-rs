@@ -56,7 +56,7 @@ pub struct ReportArticle {
 
 // ── API response types (sent to frontend) ────────────────────────────────────
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct FeedCard {
     pub id: String,
     pub intent: String,
@@ -75,7 +75,7 @@ pub struct FeedCard {
     pub articles: Vec<ArticleRef>,
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ArticleRef {
     pub title: String,
     pub url: String,
