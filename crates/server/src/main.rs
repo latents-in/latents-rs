@@ -1,6 +1,6 @@
 use axum::{
-    routing::{get, post},
     Router,
+    routing::{get, post},
 };
 use latents_server::{
     config::Config,
@@ -61,7 +61,10 @@ async fn main() -> anyhow::Result<()> {
         .connect_with(migration_options)
         .await?;
 
-    sqlx::migrate!("./migrations").set_ignore_missing(true).run(&migration_pool).await?;
+    sqlx::migrate!("./migrations")
+        .set_ignore_missing(true)
+        .run(&migration_pool)
+        .await?;
     migration_pool.close().await;
     info!("Migrations completed successfully");
 

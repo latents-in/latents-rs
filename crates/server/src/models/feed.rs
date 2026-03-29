@@ -36,6 +36,8 @@ pub struct IntelligenceReport {
     pub regions: Vec<String>,
     /// Stored as JSONB array of strings
     pub bullets: Json<Vec<String>>,
+    /// Stored as JSONB array of BulletDetail
+    pub bullet_summaries: Json<Vec<BulletDetail>>,
     pub why_it_matters: String,
     pub opportunity_score: i32,
     pub source_count: i32,
@@ -64,12 +66,16 @@ pub struct FeedCard {
     pub risk_level: String,
     pub regions: Vec<String>,
     pub bullets: Vec<String>,
+    pub bullet_details: Vec<BulletDetail>,
     pub why_it_matters: String,
     pub opportunity_score: i32,
     pub source: String,
+    pub source_url: String,
     pub source_count: i32,
     pub likes_count: i32,
     pub saves_count: i32,
+    pub liked: bool,
+    pub saved: bool,
     pub published_at: String,
     pub cache_status: String,
     pub articles: Vec<ArticleRef>,
@@ -127,7 +133,7 @@ pub struct NewsApiResponse {
 /// Step 1: intent classification
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct IntentResult {
-    pub intent: String,   // "news" | "jobs" | "incidents" | "mixed"
+    pub intent: String, // "news" | "jobs" | "incidents" | "mixed"
     pub country: String,
     pub keywords: Vec<String>,
 }
@@ -136,9 +142,9 @@ pub struct IntentResult {
 #[derive(Debug, Deserialize, Clone)]
 pub struct AiSitrepResult {
     pub title: String,
-    pub risk_level: String,         // Low / Medium / High / Critical
+    pub risk_level: String, // Low / Medium / High / Critical
     pub regions: Vec<String>,
-    pub bullets: Vec<String>,       // 3-5 bullet points
+    pub bullets: Vec<String>, // 3-5 bullet points
     pub why_it_matters: String,
     pub opportunity_score: Option<i32>,
 }
@@ -165,4 +171,10 @@ pub struct CategorizedArticle {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OpenRouterCategoryResponse {
     pub articles: Vec<CategorizedArticle>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct BulletDetail {
+    pub bullet: String,
+    pub summary: String,
 }

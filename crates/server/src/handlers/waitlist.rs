@@ -1,15 +1,10 @@
 use crate::{
+    db::waitlist as waitlist_db,
     error::{AppError, Result},
     models::{WaitlistEntry, WaitlistRequest, WaitlistResponse},
     state::AppState,
-    db::waitlist as waitlist_db,
 };
-use axum::{
-    extract::State,
-    http::StatusCode,
-    response::IntoResponse,
-    Json,
-};
+use axum::{Json, extract::State, http::StatusCode, response::IntoResponse};
 use std::sync::Arc;
 use validator::Validate;
 
@@ -18,7 +13,8 @@ pub async fn add_to_waitlist(
     Json(payload): Json<WaitlistRequest>,
 ) -> Result<impl IntoResponse> {
     // Validate request
-    payload.validate()
+    payload
+        .validate()
         .map_err(|e| AppError::Validation(e.to_string()))?;
 
     // Determine location:
@@ -34,7 +30,8 @@ pub async fn add_to_waitlist(
         &payload.name,
         location.as_deref(),
         payload.role.as_deref(),
-    ).await?;
+    )
+    .await?;
 
     Ok((
         StatusCode::OK,
@@ -46,9 +43,7 @@ pub async fn add_to_waitlist(
     ))
 }
 
-pub async fn get_waitlist(
-    State(state): State<Arc<AppState>>,
-) -> Result<Json<Vec<WaitlistEntry>>> {
+pub async fn get_waitlist(State(state): State<Arc<AppState>>) -> Result<Json<Vec<WaitlistEntry>>> {
     let entries = waitlist_db::get_all_waitlist_entries(&state.db).await?;
     Ok(Json(entries))
 }

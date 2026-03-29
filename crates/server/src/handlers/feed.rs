@@ -1,8 +1,8 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::IntoResponse,
-    Json,
 };
 use std::sync::Arc;
 use uuid::Uuid;
@@ -31,10 +31,14 @@ pub async fn get_feed(
         .get_query()
         .ok_or_else(|| AppError::BadRequest("Missing query parameter ?q=".into()))?;
 
-
-
     let page = params.page.unwrap_or(1).max(1);
-    let response = get_intelligence_feed(query, page, state).await?;
+    let user_id = headers
+        .get("x-user-id")
+        .and_then(|h| h.to_str().ok())
+        .map(|s| s.to_string())
+        .unwrap_or_default();
+
+    let response = get_intelligence_feed(query, page, user_id, state).await?;
 
     Ok((StatusCode::OK, Json(response)))
 }

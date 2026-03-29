@@ -1,8 +1,8 @@
 use dashmap::DashMap;
 use redis::aio::ConnectionManager;
 use sqlx::PgPool;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use tokio::sync::Mutex;
 
 /// Manages a rotating list of API keys in a highly concurrent thread-safe manner

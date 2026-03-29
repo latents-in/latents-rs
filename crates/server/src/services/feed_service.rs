@@ -1,15 +1,14 @@
 use crate::{
     error::{AppError, Result},
     models::feed::{
-        AiSitrepResult, ArticleRef, FeedCard, FeedResponse, IntelligenceReport,
-        IntentResult, NewsApiArticle, NewsApiResponse,
+        AiSitrepResult, ArticleRef, FeedCard, FeedResponse, IntelligenceReport, IntentResult,
+        NewsApiArticle, NewsApiResponse,
     },
     state::AppState,
 };
 use redis::AsyncCommands;
 use reqwest::Client;
 use serde_json::json;
-use sqlx::types::Json;
 use std::{
     collections::HashSet,
     sync::Arc,
@@ -22,11 +21,11 @@ const RATE_LIMIT_MAX_REQUESTS: u32 = 20;
 const RATE_LIMIT_WINDOW_SECS: u64 = 3600;
 
 // Cache TTLs by intent
-const TTL_NEWS_SECS: u64 = 600;       // 10 min — news is fresh, short cache
-const TTL_INCIDENTS_SECS: u64 = 300;  // 5 min — incidents change fast
-const TTL_JOBS_SECS: u64 = 3600;      // 1 hr  — jobs are stable
+const TTL_NEWS_SECS: u64 = 600; // 10 min — news is fresh, short cache
+const TTL_INCIDENTS_SECS: u64 = 300; // 5 min — incidents change fast
+const TTL_JOBS_SECS: u64 = 3600; // 1 hr  — jobs are stable
 const TTL_MIXED_SECS: u64 = 600;
-const DB_CACHE_HOURS: i64 = 8;        // Re-generate report after 8 hours
+const DB_CACHE_HOURS: i64 = 8; // Re-generate report after 8 hours
 
 pub async fn enforce_rate_limit(ip: &str, state: &Arc<AppState>) -> Result<()> {
     let mut entry = state
@@ -63,6 +62,102 @@ fn ttl_for_intent(intent: &str) -> u64 {
     }
 }
 
+async fn fetch_user_flags(
+    db: &sqlx::PgPool,
+    report_ids: &[uuid::Uuid],
+    user_id: &str,
+) -> Result<std::collections::HashMap<uuid::Uuid, (bool, bool)>> {
+    if user_id.is_empty() || report_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let rows = sqlx::query!(
+        r#"
+        SELECT report_id, action FROM feed_interactions
+        WHERE user_id = $1 AND report_id = ANY($2)
+        "#,
+        user_id,
+        report_ids
+    )
+    .fetch_all(db)
+    .await?;
+
+    let mut map = std::collections::HashMap::new();
+    for row in rows {
+        let entry = map.entry(row.report_id).or_insert((false, false));
+        match row.action.as_str() {
+            "like" => entry.0 = true,
+            "save" => entry.1 = true,
+            _ => {}
+        }
+    }
+    Ok(map)
+}
+
+async fn expand_bullets(
+    client: &Client,
+    bullets: &[String],
+    query: &str,
+    state: &Arc<AppState>,
+) -> Result<Vec<crate::models::feed::BulletDetail>> {
+    let mut results = Vec::new();
+    for b in bullets.iter().take(5) {
+        let prompt = format!(
+            "Topic: {query}\nBullet: {b}\nWrite a neutral news brief of 60-100 words expanding this bullet. Keep it concise, factual, and avoid repetition. Do not include a title."
+        );
+        let payload = json!({
+            "model": "openai/gpt-4o-mini",
+            "messages": [
+                {"role":"system","content":"You are a concise analyst producing short briefs."},
+                {"role":"user","content": prompt}
+            ],
+            "max_tokens": 140
+        });
+
+        let mut summary = String::new();
+        for _ in 0..2 {
+            if let Some(api_key) = state.openrouter_keys.get_key() {
+                let resp = client
+                    .post("https://openrouter.ai/api/v1/chat/completions")
+                    .header("Authorization", format!("Bearer {api_key}"))
+                    .header("HTTP-Referer", "https://www.latents.in")
+                    .header("X-Title", "Latents Bullet Expander")
+                    .json(&payload)
+                    .send()
+                    .await;
+                match resp {
+                    Ok(res) if res.status().is_success() => {
+                        let data: serde_json::Value = res.json().await.map_err(|e| {
+                            AppError::InternalError(anyhow::anyhow!(format!(
+                                "OpenRouter bullet JSON parse: {e}"
+                            )))
+                        })?;
+                        summary = data["choices"][0]["message"]["content"]
+                            .as_str()
+                            .unwrap_or("")
+                            .trim()
+                            .to_string();
+                        break;
+                    }
+                    Ok(res)
+                        if res.status() == reqwest::StatusCode::TOO_MANY_REQUESTS
+                            || res.status() == reqwest::StatusCode::UNAUTHORIZED =>
+                    {
+                        state.openrouter_keys.rotate();
+                    }
+                    _ => state.openrouter_keys.rotate(),
+                }
+            }
+        }
+        if summary.is_empty() {
+            summary = b.clone();
+        }
+        results.push(crate::models::feed::BulletDetail {
+            bullet: b.clone(),
+            summary,
+        });
+    }
+    Ok(results)
+}
 // ─────────────────────────────────────────────────────────────────────────────
 // Public entry point
 // ─────────────────────────────────────────────────────────────────────────────
@@ -70,6 +165,7 @@ fn ttl_for_intent(intent: &str) -> u64 {
 pub async fn get_intelligence_feed(
     query: String,
     page: i64,
+    user_id: String,
     state: Arc<AppState>,
 ) -> Result<FeedResponse> {
     const PAGE_SIZE: i64 = 10;
@@ -79,20 +175,35 @@ pub async fn get_intelligence_feed(
         let reports: Vec<IntelligenceReport> = sqlx::query_as(
             "SELECT * FROM intelligence_reports ORDER BY opportunity_score DESC, created_at DESC LIMIT $1 OFFSET $2"
         ).bind(PAGE_SIZE).bind(offset).fetch_all(&state.db).await.unwrap_or_default();
-        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM intelligence_reports").fetch_one(&state.db).await.unwrap_or(0);
+        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM intelligence_reports")
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or(0);
         let mut items = Vec::new();
         for r in reports {
-            let articles = fetch_articles_for_report(r.id, &state.db).await.unwrap_or_default();
-            items.push(report_to_card(r, articles, "postgres"));
+            let articles = fetch_articles_for_report(r.id, &state.db)
+                .await
+                .unwrap_or_default();
+            items.push(report_to_card(r, articles, "postgres", false, false));
         }
-        return Ok(FeedResponse { items, total, page, has_more: offset + PAGE_SIZE < total, cache_status: "postgres".into() });
+        return Ok(FeedResponse {
+            items,
+            total,
+            page,
+            has_more: offset + PAGE_SIZE < total,
+            cache_status: "postgres".into(),
+        });
     }
 
     let qn = query.trim().to_lowercase();
-    
+
     // Only generate new sitrep on page 1
     if page == 1 {
-        let lock = state.active_fetches.entry(qn.clone()).or_insert_with(|| Arc::new(Mutex::new(()))).clone();
+        let lock = state
+            .active_fetches
+            .entry(qn.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone();
         let _guard = lock.lock().await;
 
         let rechecked: Option<IntelligenceReport> = sqlx::query_as(
@@ -101,30 +212,67 @@ pub async fn get_intelligence_feed(
 
         if rechecked.is_none() {
             info!("Cache miss — running 4-step intelligence pipeline for: {qn}");
-            let client = Client::builder().timeout(Duration::from_secs(30)).user_agent("latents-server/1.0").build().unwrap();
+            let client = Client::builder()
+                .timeout(Duration::from_secs(30))
+                .user_agent("latents-server/1.0")
+                .build()
+                .unwrap();
 
-            let intent = classify_intent(&client, &qn, &state).await.unwrap_or_else(|_| IntentResult { intent: "news".into(), country: "".into(), keywords: vec![qn.clone()] });
-            let search_keywords = if intent.keywords.is_empty() { vec![qn.clone()] } else { intent.keywords.clone() };
-            let raw_articles = fetch_news_api(&client, &search_keywords.join(" "), &state).await.unwrap_or_default();
+            let intent = classify_intent(&client, &qn, &state)
+                .await
+                .unwrap_or_else(|_| IntentResult {
+                    intent: "news".into(),
+                    country: "".into(),
+                    keywords: vec![qn.clone()],
+                });
+            let search_keywords = if intent.keywords.is_empty() {
+                vec![qn.clone()]
+            } else {
+                intent.keywords.clone()
+            };
+            let raw_articles = fetch_news_api(&client, &search_keywords.join(" "), &state)
+                .await
+                .unwrap_or_default();
 
             if !raw_articles.is_empty() {
                 let deduped = dedupe_and_rank(raw_articles);
                 let top_articles = deduped.into_iter().take(20).collect::<Vec<_>>();
-                let sitrep = ai_summarize(&client, &top_articles, &qn, &state).await.unwrap_or_else(|_| AiSitrepResult {
-                    title: qn.clone(), risk_level: "Medium".into(), regions: vec!["Global".into()],
-                    bullets: top_articles.iter().take(4).map(|a| a.title.clone()).collect(),
-                    why_it_matters: "No AI summary available — showing raw headlines.".into(),
-                    opportunity_score: Some(70),
-                });
+                let sitrep = ai_summarize(&client, &top_articles, &qn, &state)
+                    .await
+                    .unwrap_or_else(|_| AiSitrepResult {
+                        title: qn.clone(),
+                        risk_level: "Medium".into(),
+                        regions: vec!["Global".into()],
+                        bullets: top_articles
+                            .iter()
+                            .take(4)
+                            .map(|a| a.title.clone())
+                            .collect(),
+                        why_it_matters: "No AI summary available — showing raw headlines.".into(),
+                        opportunity_score: Some(70),
+                    });
 
-                let safe_risk = match sitrep.risk_level.as_str() { "Low" | "Medium" | "High" | "Critical" => sitrep.risk_level.clone(), _ => "Medium".into() };
-                let safe_intent = match intent.intent.as_str() { "news" | "jobs" | "incidents" | "mixed" => intent.intent.clone(), _ => "news".into() };
-                let bullets_json: serde_json::Value = serde_json::to_value(&sitrep.bullets).unwrap_or(json!([]));
+                let safe_risk = match sitrep.risk_level.as_str() {
+                    "Low" | "Medium" | "High" | "Critical" => sitrep.risk_level.clone(),
+                    _ => "Medium".into(),
+                };
+                let safe_intent = match intent.intent.as_str() {
+                    "news" | "jobs" | "incidents" | "mixed" => intent.intent.clone(),
+                    _ => "news".into(),
+                };
+                let bullets_json: serde_json::Value =
+                    serde_json::to_value(&sitrep.bullets).unwrap_or(json!([]));
                 let opp_score = sitrep.opportunity_score.unwrap_or(70).clamp(0, 100);
 
+                let bullet_details = expand_bullets(&client, &sitrep.bullets, &qn, &state)
+                    .await
+                    .unwrap_or_default();
+                let bullet_json: serde_json::Value =
+                    serde_json::to_value(&bullet_details).unwrap_or(json!([]));
+
                 if let Ok(report_id) = sqlx::query_scalar::<_, uuid::Uuid>(
-                    "INSERT INTO intelligence_reports (search_query, intent, risk_level, regions, bullets, why_it_matters, opportunity_score, source_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id"
-                ).bind(&qn).bind(&safe_intent).bind(&safe_risk).bind(&sitrep.regions).bind(&bullets_json).bind(&sitrep.why_it_matters).bind(opp_score).bind(top_articles.len() as i32).fetch_one(&state.db).await {
+                    "INSERT INTO intelligence_reports (search_query, intent, risk_level, regions, bullets, bullet_summaries, why_it_matters, opportunity_score, source_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id"
+                ).bind(&qn).bind(&safe_intent).bind(&safe_risk).bind(&sitrep.regions).bind(&bullets_json).bind(&bullet_json).bind(&sitrep.why_it_matters).bind(opp_score).bind(top_articles.len() as i32).fetch_one(&state.db).await {
                     for article in &top_articles {
                         let source_name = article.source.as_ref().and_then(|s| s.name.clone()).unwrap_or_else(|| "Unknown".into());
                         let pub_at = article.published_at.unwrap_or_else(chrono::Utc::now);
@@ -141,14 +289,37 @@ pub async fn get_intelligence_feed(
         "SELECT * FROM intelligence_reports WHERE search_query ILIKE $1 ORDER BY opportunity_score DESC, created_at DESC LIMIT $2 OFFSET $3"
     ).bind(&pattern).bind(PAGE_SIZE).bind(offset).fetch_all(&state.db).await.unwrap_or_default();
 
-    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM intelligence_reports WHERE search_query ILIKE $1").bind(&pattern).fetch_one(&state.db).await.unwrap_or(1);
+    let total: i64 =
+        sqlx::query_scalar("SELECT COUNT(*) FROM intelligence_reports WHERE search_query ILIKE $1")
+            .bind(&pattern)
+            .fetch_one(&state.db)
+            .await
+            .unwrap_or(1);
     let mut items = Vec::new();
-    for r in reports {
-        let articles = fetch_articles_for_report(r.id, &state.db).await.unwrap_or_default();
-        items.push(report_to_card(r, articles, "postgres"));
+    let mut report_ids = Vec::new();
+    for r in &reports {
+        report_ids.push(r.id);
     }
 
-    Ok(FeedResponse { items, total, page, has_more: offset + PAGE_SIZE < total, cache_status: "postgres".into() })
+    let user_flags = fetch_user_flags(&state.db, &report_ids, &user_id)
+        .await
+        .unwrap_or_default();
+
+    for r in reports {
+        let articles = fetch_articles_for_report(r.id, &state.db)
+            .await
+            .unwrap_or_default();
+        let (liked, saved) = user_flags.get(&r.id).cloned().unwrap_or((false, false));
+        items.push(report_to_card(r, articles, "postgres", liked, saved));
+    }
+
+    Ok(FeedResponse {
+        items,
+        total,
+        page,
+        has_more: offset + PAGE_SIZE < total,
+        cache_status: "postgres".into(),
+    })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -237,23 +408,37 @@ fn report_to_card(
     r: IntelligenceReport,
     articles: Vec<crate::models::feed::ReportArticle>,
     cache_status: &str,
+    liked: bool,
+    saved: bool,
 ) -> FeedCard {
-    let article_refs = articles
+    let article_refs: Vec<ArticleRef> = articles
         .into_iter()
         .map(|a| ArticleRef {
             title: a.title,
             url: a.url,
             source: a.source,
-            published_at: a.published_at.format("%b %d, %Y").to_string(),
+            published_at: a
+                .published_at
+                .with_timezone(&chrono::FixedOffset::east_opt(19800).unwrap())
+                .format("%b %d, %Y · %H:%M IST")
+                .to_string(),
         })
         .collect();
 
-    let first_source = r
-        .search_query
-        .split_whitespace()
-        .next()
-        .unwrap_or("Intelligence")
-        .to_string();
+    let first_source = article_refs
+        .get(0)
+        .map(|a| a.source.clone())
+        .unwrap_or_else(|| {
+            r.search_query
+                .split_whitespace()
+                .next()
+                .unwrap_or("Intelligence")
+                .to_string()
+        });
+    let first_url = article_refs
+        .get(0)
+        .map(|a| a.url.clone())
+        .unwrap_or_default();
 
     FeedCard {
         id: r.id.to_string(),
@@ -262,13 +447,21 @@ fn report_to_card(
         risk_level: r.risk_level,
         regions: r.regions,
         bullets: r.bullets.0,
+        bullet_details: r.bullet_summaries.0,
         why_it_matters: r.why_it_matters,
         opportunity_score: r.opportunity_score,
         source: first_source,
+        source_url: first_url,
         source_count: r.source_count,
         likes_count: r.likes_count,
         saves_count: r.saves_count,
-        published_at: r.created_at.format("%b %d · %H:%M UTC").to_string(),
+        liked,
+        saved,
+        published_at: r
+            .created_at
+            .with_timezone(&chrono::FixedOffset::east_opt(19800).unwrap())
+            .format("%b %d · %H:%M IST")
+            .to_string(),
         cache_status: cache_status.to_string(),
         articles: article_refs,
     }
@@ -278,10 +471,7 @@ async fn backfill_redis(state: &Arc<AppState>, key: &str, card: &FeedCard, ttl: 
     if let Some(redis) = &state.redis {
         if let Ok(serialized) = serde_json::to_string(card) {
             let mut conn = redis.lock().await;
-            if let Err(e) = conn
-                .set_ex::<_, _, ()>(key, serialized, ttl)
-                .await
-            {
+            if let Err(e) = conn.set_ex::<_, _, ()>(key, serialized, ttl).await {
                 warn!("Redis set error (non-fatal): {e}");
             }
         }
@@ -356,11 +546,14 @@ Return ONLY valid JSON:
     if !res.status().is_success() {
         state.openrouter_keys.rotate();
         return Err(AppError::InternalError(anyhow::anyhow!(
-            "OpenRouter classify returned {}", res.status()
+            "OpenRouter classify returned {}",
+            res.status()
         )));
     }
 
-    let data: serde_json::Value = res.json().await.map_err(|e| AppError::InternalError(anyhow::anyhow!("OpenRouter classify JSON parse: {e}")))?;
+    let data: serde_json::Value = res.json().await.map_err(|e| {
+        AppError::InternalError(anyhow::anyhow!("OpenRouter classify JSON parse: {e}"))
+    })?;
     let content = data["choices"][0]["message"]["content"]
         .as_str()
         .unwrap_or("{}");
@@ -498,7 +691,9 @@ Rules:
             .await
         {
             Ok(res) if res.status().is_success() => {
-                let data: serde_json::Value = res.json().await.map_err(|e| AppError::InternalError(anyhow::anyhow!("OpenRouter summarize JSON parse: {e}")))?;
+                let data: serde_json::Value = res.json().await.map_err(|e| {
+                    AppError::InternalError(anyhow::anyhow!("OpenRouter summarize JSON parse: {e}"))
+                })?;
                 let content = data["choices"][0]["message"]["content"]
                     .as_str()
                     .unwrap_or("{}");

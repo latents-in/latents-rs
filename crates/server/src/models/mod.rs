@@ -1,4 +1,4 @@
-pub mod waitlist;
 pub mod feed;
+pub mod waitlist;
 
 pub use waitlist::*;

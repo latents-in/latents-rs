@@ -23,8 +23,8 @@ impl Config {
     pub fn from_env() -> Result<Self> {
         dotenvy::dotenv().ok();
 
-        let database_url = env::var("DATABASE_URL")
-            .expect("DATABASE_URL must be set in environment");
+        let database_url =
+            env::var("DATABASE_URL").expect("DATABASE_URL must be set in environment");
 
         let direct_url = env::var("DIRECT_URL").ok();
 
