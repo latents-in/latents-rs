@@ -31,9 +31,7 @@ pub async fn get_feed(
         .get_query()
         .ok_or_else(|| AppError::BadRequest("Missing query parameter ?q=".into()))?;
 
-    if query.trim().is_empty() {
-        return Err(AppError::BadRequest("Query cannot be empty".into()));
-    }
+
 
     let page = params.page.unwrap_or(1).max(1);
     let response = get_intelligence_feed(query, page, state).await?;

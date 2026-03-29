@@ -308,9 +308,11 @@ export default function Home() {
   const [searched, setSearched] = useState(false); // has the user searched at least once?
   const stageTimer = useRef(null);
   const inputRef = useRef(null);
-
-  // Focus input on mount
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  const observerTarget = useRef(null);
+  const pageRef = useRef(1);
+  const hasMoreRef = useRef(true);
+  const loadingRef = useRef(false);
+  const queryRef = useRef('');
 
   // Cycle through pipeline stages during fetch
   const startPipelineAnim = () => {
@@ -327,42 +329,80 @@ export default function Home() {
     setStageIdx(-1);
   };
 
-  const handleSearch = async (e) => {
-    e?.preventDefault();
-    if (!query.trim() || loading) return;
+  const fetchFeed = useCallback(async (isLoadMore = false, searchQuery = '') => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     setError(null);
-    setSearched(true);
-    startPipelineAnim();
+    queryRef.current = searchQuery;
+    
+    if (!isLoadMore) {
+        if (searchQuery) startPipelineAnim(); // Run anim only if actual search
+        pageRef.current = 1;
+        hasMoreRef.current = true;
+        setFeed([]);
+    }
 
+    const targetPage = isLoadMore ? pageRef.current + 1 : 1;
+    
     try {
-      const res = await fetch(
-        `${API_URL}/api/feed?query=${encodeURIComponent(query.trim())}&page=1`
-      );
+      const res = await fetch(`${API_URL}/api/feed?query=${encodeURIComponent(searchQuery.trim())}&page=${targetPage}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || `Server error ${res.status}`);
       }
       const data = await res.json();
-      if (data.items && data.items.length > 0) {
-        // Prepend new results to feed
+      hasMoreRef.current = data.has_more;
+      
+      if (isLoadMore) {
+        pageRef.current = targetPage;
         setFeed(prev => {
           const existingIds = new Set(prev.map(i => i.id));
           const fresh = data.items.filter(i => !existingIds.has(i.id));
-          return [...fresh, ...prev];
+          return [...prev, ...fresh];
         });
-        setSelected(data.items[0].id);
       } else {
-        setError('No intelligence found for that query. Try a different topic.');
+        if (data.items && data.items.length > 0) {
+          setFeed(data.items);
+          setSelected(data.items[0].id);
+        } else {
+          setError(searchQuery ? 'No intelligence found for that query. Try a different topic.' : 'No initial feed found.');
+        }
       }
     } catch (err) {
-      setError(err.message || 'Failed to fetch intelligence. Please try again.');
+      setError(err.message || 'Failed to fetch. Please try again.');
     } finally {
       stopPipelineAnim();
+      loadingRef.current = false;
       setLoading(false);
-      setQuery('');
     }
+  }, []);
+
+  const handleSearch = (e) => {
+    e?.preventDefault();
+    if (!query.trim() || loadingRef.current) return;
+    setSearched(true);
+    fetchFeed(false, query);
   };
+
+  useEffect(() => { 
+    inputRef.current?.focus(); 
+    fetchFeed(false, ''); 
+    setSearched(true); 
+  }, [fetchFeed]);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      entries => {
+        if (entries[0].isIntersecting && hasMoreRef.current && !loadingRef.current) {
+          fetchFeed(true, queryRef.current);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (observerTarget.current) observer.observe(observerTarget.current);
+    return () => { observer.disconnect(); };
+  }, [fetchFeed]);
 
   const filtered = filter === 'all' ? feed : feed.filter(i => i.intent === filter);
 
@@ -639,6 +679,11 @@ export default function Home() {
               onInteract={() => { }}
             />
           ))}
+          
+          {/* Intersection Observer target for infinite scroll */}
+          {feed.length > 0 && (
+            <div ref={observerTarget} style={{ height: 20, width: '100%', marginBottom: 20 }}></div>
+          )}
         </div>
       </main>
 

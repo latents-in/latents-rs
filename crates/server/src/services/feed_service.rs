@@ -72,255 +72,83 @@ pub async fn get_intelligence_feed(
     page: i64,
     state: Arc<AppState>,
 ) -> Result<FeedResponse> {
-    let qn = query.trim().to_lowercase();
-    let ck = cache_key(&qn);
+    const PAGE_SIZE: i64 = 10;
+    let offset = (page - 1) * PAGE_SIZE;
 
-    // ── L1: Redis cache ───────────────────────────────────────────────────────
-    if let Some(redis) = &state.redis {
-        let mut conn = redis.lock().await;
-        match conn.get::<_, Option<String>>(&ck).await {
-            Ok(Some(cached)) => {
-                info!("Redis L1 hit for query: {qn}");
-                if let Ok(item) = serde_json::from_str::<FeedCard>(&cached) {
-                    return Ok(FeedResponse {
-                        items: vec![item],
-                        total: 1,
-                        page,
-                        has_more: false,
-                        cache_status: "redis".into(),
-                    });
+    if query.trim().is_empty() {
+        let reports: Vec<IntelligenceReport> = sqlx::query_as(
+            "SELECT * FROM intelligence_reports ORDER BY opportunity_score DESC, created_at DESC LIMIT $1 OFFSET $2"
+        ).bind(PAGE_SIZE).bind(offset).fetch_all(&state.db).await.unwrap_or_default();
+        let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM intelligence_reports").fetch_one(&state.db).await.unwrap_or(0);
+        let mut items = Vec::new();
+        for r in reports {
+            let articles = fetch_articles_for_report(r.id, &state.db).await.unwrap_or_default();
+            items.push(report_to_card(r, articles, "postgres"));
+        }
+        return Ok(FeedResponse { items, total, page, has_more: offset + PAGE_SIZE < total, cache_status: "postgres".into() });
+    }
+
+    let qn = query.trim().to_lowercase();
+    
+    // Only generate new sitrep on page 1
+    if page == 1 {
+        let lock = state.active_fetches.entry(qn.clone()).or_insert_with(|| Arc::new(Mutex::new(()))).clone();
+        let _guard = lock.lock().await;
+
+        let rechecked: Option<IntelligenceReport> = sqlx::query_as(
+            "SELECT * FROM intelligence_reports WHERE search_query = $1 AND created_at > NOW() - INTERVAL '8 hours' ORDER BY created_at DESC LIMIT 1"
+        ).bind(&qn).fetch_optional(&state.db).await.unwrap_or(None);
+
+        if rechecked.is_none() {
+            info!("Cache miss — running 4-step intelligence pipeline for: {qn}");
+            let client = Client::builder().timeout(Duration::from_secs(30)).user_agent("latents-server/1.0").build().unwrap();
+
+            let intent = classify_intent(&client, &qn, &state).await.unwrap_or_else(|_| IntentResult { intent: "news".into(), country: "".into(), keywords: vec![qn.clone()] });
+            let search_keywords = if intent.keywords.is_empty() { vec![qn.clone()] } else { intent.keywords.clone() };
+            let raw_articles = fetch_news_api(&client, &search_keywords.join(" "), &state).await.unwrap_or_default();
+
+            if !raw_articles.is_empty() {
+                let deduped = dedupe_and_rank(raw_articles);
+                let top_articles = deduped.into_iter().take(20).collect::<Vec<_>>();
+                let sitrep = ai_summarize(&client, &top_articles, &qn, &state).await.unwrap_or_else(|_| AiSitrepResult {
+                    title: qn.clone(), risk_level: "Medium".into(), regions: vec!["Global".into()],
+                    bullets: top_articles.iter().take(4).map(|a| a.title.clone()).collect(),
+                    why_it_matters: "No AI summary available — showing raw headlines.".into(),
+                    opportunity_score: Some(70),
+                });
+
+                let safe_risk = match sitrep.risk_level.as_str() { "Low" | "Medium" | "High" | "Critical" => sitrep.risk_level.clone(), _ => "Medium".into() };
+                let safe_intent = match intent.intent.as_str() { "news" | "jobs" | "incidents" | "mixed" => intent.intent.clone(), _ => "news".into() };
+                let bullets_json: serde_json::Value = serde_json::to_value(&sitrep.bullets).unwrap_or(json!([]));
+                let opp_score = sitrep.opportunity_score.unwrap_or(70).clamp(0, 100);
+
+                if let Ok(report_id) = sqlx::query_scalar::<_, uuid::Uuid>(
+                    "INSERT INTO intelligence_reports (search_query, intent, risk_level, regions, bullets, why_it_matters, opportunity_score, source_count) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id"
+                ).bind(&qn).bind(&safe_intent).bind(&safe_risk).bind(&sitrep.regions).bind(&bullets_json).bind(&sitrep.why_it_matters).bind(opp_score).bind(top_articles.len() as i32).fetch_one(&state.db).await {
+                    for article in &top_articles {
+                        let source_name = article.source.as_ref().and_then(|s| s.name.clone()).unwrap_or_else(|| "Unknown".into());
+                        let pub_at = article.published_at.unwrap_or_else(chrono::Utc::now);
+                        let _ = sqlx::query("INSERT INTO report_articles (report_id, title, url, source, published_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING").bind(report_id).bind(&article.title).bind(&article.url).bind(&source_name).bind(pub_at).execute(&state.db).await;
+                    }
                 }
             }
-            Ok(None) => {}
-            Err(e) => warn!("Redis get error (non-fatal): {e}"),
         }
-    }
-
-    // ── L2: Postgres cache ────────────────────────────────────────────────────
-    let cached_report: Option<IntelligenceReport> = sqlx::query_as(
-        "SELECT * FROM intelligence_reports
-         WHERE search_query = $1
-           AND created_at > NOW() - INTERVAL '8 hours'
-         ORDER BY created_at DESC
-         LIMIT 1",
-    )
-    .bind(&qn)
-    .fetch_optional(&state.db)
-    .await?;
-
-    if let Some(report) = cached_report {
-        info!("Postgres L2 hit for query: {qn}");
-        let articles = fetch_articles_for_report(report.id, &state.db).await?;
-        let card = report_to_card(report, articles, "postgres");
-        // Backfill Redis
-        backfill_redis(&state, &ck, &card, TTL_MIXED_SECS).await;
-        return Ok(FeedResponse {
-            items: vec![card],
-            total: 1,
-            page,
-            has_more: false,
-            cache_status: "postgres".into(),
-        });
-    }
-
-    // ── Stampede lock: only one goroutine runs the pipeline per query ─────────
-    let lock = state
-        .active_fetches
-        .entry(qn.clone())
-        .or_insert_with(|| Arc::new(Mutex::new(())))
-        .clone();
-    let _guard = lock.lock().await;
-
-    // Re-check after acquiring lock
-    let rechecked: Option<IntelligenceReport> = sqlx::query_as(
-        "SELECT * FROM intelligence_reports
-         WHERE search_query = $1
-           AND created_at > NOW() - INTERVAL '8 hours'
-         ORDER BY created_at DESC
-         LIMIT 1",
-    )
-    .bind(&qn)
-    .fetch_optional(&state.db)
-    .await?;
-
-    if let Some(report) = rechecked {
-        let articles = fetch_articles_for_report(report.id, &state.db).await?;
-        let card = report_to_card(report, articles, "postgres");
         state.active_fetches.remove(&qn);
-        return Ok(FeedResponse {
-            items: vec![card],
-            total: 1,
-            page,
-            has_more: false,
-            cache_status: "postgres".into(),
-        });
     }
 
-    // ── PIPELINE ──────────────────────────────────────────────────────────────
-    info!("Cache miss — running 4-step intelligence pipeline for: {qn}");
-    let client = Client::builder()
-        .timeout(Duration::from_secs(30))
-        .build()
-        .unwrap();
+    let pattern = format!("%{}%", qn);
+    let reports: Vec<IntelligenceReport> = sqlx::query_as(
+        "SELECT * FROM intelligence_reports WHERE search_query ILIKE $1 ORDER BY opportunity_score DESC, created_at DESC LIMIT $2 OFFSET $3"
+    ).bind(&pattern).bind(PAGE_SIZE).bind(offset).fetch_all(&state.db).await.unwrap_or_default();
 
-    // Step 1 — Intent Classification
-    let intent = classify_intent(&client, &qn, &state)
-        .await
-        .unwrap_or_else(|_| IntentResult {
-            intent: "news".into(),
-            country: "".into(),
-            keywords: vec![qn.clone()],
-        });
-    info!("Intent: {:?}", intent);
-
-    // Step 2 — Aggregate sources using classified keywords
-    let search_keywords = if intent.keywords.is_empty() {
-        vec![qn.clone()]
-    } else {
-        intent.keywords.clone()
-    };
-    let raw_articles = fetch_news_api(&client, &search_keywords.join(" "), &state).await?;
-
-    if raw_articles.is_empty() {
-        state.active_fetches.remove(&qn);
-        return Ok(FeedResponse {
-            items: vec![],
-            total: 0,
-            page,
-            has_more: false,
-            cache_status: "live".into(),
-        });
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM intelligence_reports WHERE search_query ILIKE $1").bind(&pattern).fetch_one(&state.db).await.unwrap_or(1);
+    let mut items = Vec::new();
+    for r in reports {
+        let articles = fetch_articles_for_report(r.id, &state.db).await.unwrap_or_default();
+        items.push(report_to_card(r, articles, "postgres"));
     }
 
-    // Step 3 — Deduplicate & rank by recency
-    let deduped = dedupe_and_rank(raw_articles);
-    let top_articles = deduped.into_iter().take(20).collect::<Vec<_>>();
-
-    // Step 4 — AI Summarization → structured situation report
-    let sitrep = ai_summarize(&client, &top_articles, &qn, &state)
-        .await
-        .unwrap_or_else(|_| AiSitrepResult {
-            title: qn.clone(),
-            risk_level: "Medium".into(),
-            regions: vec!["Global".into()],
-            bullets: top_articles
-                .iter()
-                .take(4)
-                .map(|a| a.title.clone())
-                .collect(),
-            why_it_matters: "No AI summary available — showing raw headlines.".into(),
-            opportunity_score: Some(70),
-        });
-
-    // ── Persist to Postgres ───────────────────────────────────────────────────
-    let safe_risk = match sitrep.risk_level.as_str() {
-        "Low" | "Medium" | "High" | "Critical" => sitrep.risk_level.clone(),
-        _ => "Medium".into(),
-    };
-    let safe_intent = match intent.intent.as_str() {
-        "news" | "jobs" | "incidents" | "mixed" => intent.intent.clone(),
-        _ => "news".into(),
-    };
-    let bullets_json: serde_json::Value =
-        serde_json::to_value(&sitrep.bullets).unwrap_or(json!([]));
-    let opp_score = sitrep.opportunity_score.unwrap_or(70).clamp(0, 100);
-
-    let report_id: uuid::Uuid = sqlx::query_scalar(
-        "INSERT INTO intelligence_reports
-            (search_query, intent, risk_level, regions, bullets, why_it_matters,
-             opportunity_score, source_count)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-         RETURNING id",
-    )
-    .bind(&qn)
-    .bind(&safe_intent)
-    .bind(&safe_risk)
-    .bind(&sitrep.regions)
-    .bind(&bullets_json)
-    .bind(&sitrep.why_it_matters)
-    .bind(opp_score)
-    .bind(top_articles.len() as i32)
-    .fetch_one(&state.db)
-    .await
-    .map_err(|e| {
-        error!("Failed to insert intelligence_report: {e}");
-        AppError::InternalError(anyhow::anyhow!("DB insert failed"))
-    })?;
-
-    for article in &top_articles {
-        let source_name = article
-            .source
-            .as_ref()
-            .and_then(|s| s.name.clone())
-            .unwrap_or_else(|| "Unknown".into());
-        let pub_at = article.published_at.unwrap_or_else(chrono::Utc::now);
-        let _ = sqlx::query(
-            "INSERT INTO report_articles (report_id, title, url, source, published_at)
-             VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
-        )
-        .bind(report_id)
-        .bind(&article.title)
-        .bind(&article.url)
-        .bind(&source_name)
-        .bind(pub_at)
-        .execute(&state.db)
-        .await;
-    }
-
-    // Build the card
-    let article_refs: Vec<ArticleRef> = top_articles
-        .iter()
-        .take(5)
-        .map(|a| ArticleRef {
-            title: a.title.clone(),
-            url: a.url.clone(),
-            source: a
-                .source
-                .as_ref()
-                .and_then(|s| s.name.clone())
-                .unwrap_or_default(),
-            published_at: a
-                .published_at
-                .map(|d| d.format("%b %d, %Y").to_string())
-                .unwrap_or_else(|| "Unknown".into()),
-        })
-        .collect();
-
-    let first_source = top_articles
-        .first()
-        .and_then(|a| a.source.as_ref())
-        .and_then(|s| s.name.clone())
-        .unwrap_or_else(|| "Multiple Sources".into());
-
-    let card = FeedCard {
-        id: report_id.to_string(),
-        intent: safe_intent,
-        title: sitrep.title,
-        risk_level: safe_risk,
-        regions: sitrep.regions,
-        bullets: sitrep.bullets,
-        why_it_matters: sitrep.why_it_matters,
-        opportunity_score: opp_score,
-        source: first_source,
-        source_count: top_articles.len() as i32,
-        likes_count: 0,
-        saves_count: 0,
-        published_at: "Just now".into(),
-        cache_status: "live".into(),
-        articles: article_refs,
-    };
-
-    // ── Backfill Redis L1 ─────────────────────────────────────────────────────
-    backfill_redis(&state, &ck, &card, ttl_for_intent(&card.intent)).await;
-    state.active_fetches.remove(&qn);
-
-    Ok(FeedResponse {
-        items: vec![card],
-        total: 1,
-        page,
-        has_more: false,
-        cache_status: "live".into(),
-    })
+    Ok(FeedResponse { items, total, page, has_more: offset + PAGE_SIZE < total, cache_status: "postgres".into() })
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -518,8 +346,8 @@ Return ONLY valid JSON:
     let res = client
         .post("https://openrouter.ai/api/v1/chat/completions")
         .header("Authorization", format!("Bearer {api_key}"))
-        .header("HTTP-Referer", "https://latents.io")
-        .header("X-Title", "Latents Intelligence OS")
+        .header("HTTP-Referer", "https://www.latents.in")
+        .header("X-Title", "Latents")
         .json(&payload)
         .send()
         .await
@@ -663,7 +491,7 @@ Rules:
         match client
             .post("https://openrouter.ai/api/v1/chat/completions")
             .header("Authorization", format!("Bearer {api_key}"))
-            .header("HTTP-Referer", "https://latents.io")
+            .header("HTTP-Referer", "https://www.latents.in")
             .header("X-Title", "Latents Intelligence OS")
             .json(&payload)
             .send()
