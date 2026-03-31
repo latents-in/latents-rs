@@ -52,8 +52,14 @@ pub async fn interact_feed(
         return Err(AppError::BadRequest("user_id is required".into()));
     }
 
-    let (toggled_off, new_count) =
-        toggle_interaction(report_id, &params.user_id, &params.action, state).await?;
+    let (toggled_off, new_count) = toggle_interaction(
+        report_id,
+        &params.user_id,
+        &params.action,
+        params.bullet_index,
+        state,
+    )
+    .await?;
 
     Ok((
         StatusCode::OK,

@@ -93,6 +93,59 @@ async fn fetch_user_flags(
     Ok(map)
 }
 
+async fn fetch_bullet_flags(
+    db: &sqlx::PgPool,
+    report_ids: &[uuid::Uuid],
+    user_id: &str,
+) -> Result<std::collections::HashMap<(uuid::Uuid, i32), (bool, bool)>> {
+    if user_id.is_empty() || report_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let rows = sqlx::query!(
+        r#"SELECT report_id, bullet_index, liked, saved FROM bullet_interactions
+           WHERE user_id = $1 AND report_id = ANY($2)"#,
+        user_id,
+        report_ids
+    )
+    .fetch_all(db)
+    .await?;
+
+    let mut map = std::collections::HashMap::new();
+    for row in rows {
+        map.insert((row.report_id, row.bullet_index), (row.liked, row.saved));
+    }
+    Ok(map)
+}
+
+async fn fetch_bullet_counts(
+    db: &sqlx::PgPool,
+    report_ids: &[uuid::Uuid],
+) -> Result<std::collections::HashMap<(uuid::Uuid, i32), (i64, i64)>> {
+    if report_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let rows = sqlx::query!(
+        r#"SELECT report_id, bullet_index,
+                  COUNT(*) FILTER (WHERE liked = true) as likes,
+                  COUNT(*) FILTER (WHERE saved = true) as saves
+           FROM bullet_interactions
+           WHERE report_id = ANY($1)
+           GROUP BY report_id, bullet_index"#,
+        report_ids
+    )
+    .fetch_all(db)
+    .await?;
+
+    let mut map = std::collections::HashMap::new();
+    for row in rows {
+        map.insert(
+            (row.report_id, row.bullet_index),
+            (row.likes.unwrap_or(0) as i64, row.saves.unwrap_or(0) as i64),
+        );
+    }
+    Ok(map)
+}
+
 async fn expand_bullets(
     client: &Client,
     bullets: &[String],
@@ -154,6 +207,11 @@ async fn expand_bullets(
         results.push(crate::models::feed::BulletDetail {
             bullet: b.clone(),
             summary,
+            liked: Some(false),
+            saved: Some(false),
+            likes_count: Some(0),
+            saves_count: Some(0),
+            source_url: None,
         });
     }
     Ok(results)
@@ -180,11 +238,21 @@ pub async fn get_intelligence_feed(
             .await
             .unwrap_or(0);
         let mut items = Vec::new();
+        let empty_flags: std::collections::HashMap<(uuid::Uuid, i32), (bool, bool)> = std::collections::HashMap::new();
+        let empty_counts: std::collections::HashMap<(uuid::Uuid, i32), (i64, i64)> = std::collections::HashMap::new();
         for r in reports {
             let articles = fetch_articles_for_report(r.id, &state.db)
                 .await
                 .unwrap_or_default();
-            items.push(report_to_card(r, articles, "postgres", false, false));
+            items.push(report_to_card(
+                r,
+                articles,
+                "postgres",
+                false,
+                false,
+                &empty_flags,
+                &empty_counts,
+            ));
         }
         return Ok(FeedResponse {
             items,
@@ -304,13 +372,27 @@ pub async fn get_intelligence_feed(
     let user_flags = fetch_user_flags(&state.db, &report_ids, &user_id)
         .await
         .unwrap_or_default();
+    let bullet_flags = fetch_bullet_flags(&state.db, &report_ids, &user_id)
+        .await
+        .unwrap_or_default();
+    let bullet_counts = fetch_bullet_counts(&state.db, &report_ids)
+        .await
+        .unwrap_or_default();
 
     for r in reports {
         let articles = fetch_articles_for_report(r.id, &state.db)
             .await
             .unwrap_or_default();
         let (liked, saved) = user_flags.get(&r.id).cloned().unwrap_or((false, false));
-        items.push(report_to_card(r, articles, "postgres", liked, saved));
+        items.push(report_to_card(
+            r,
+            articles,
+            "postgres",
+            liked,
+            saved,
+            &bullet_flags,
+            &bullet_counts,
+        ));
     }
 
     Ok(FeedResponse {
@@ -330,12 +412,17 @@ pub async fn toggle_interaction(
     report_id: uuid::Uuid,
     user_id: &str,
     action: &str,
+    bullet_index: Option<i32>,
     state: Arc<AppState>,
 ) -> Result<(bool, i64)> {
     let safe_action = match action {
         "like" | "save" => action,
         _ => return Err(AppError::BadRequest("Invalid action".into())),
     };
+
+    if let Some(idx) = bullet_index {
+        return toggle_bullet_interaction(report_id, user_id, safe_action, idx, state).await;
+    }
 
     // Try to delete first (toggle off)
     let deleted = sqlx::query(
@@ -387,6 +474,77 @@ pub async fn toggle_interaction(
     Ok((toggled_off, new_count))
 }
 
+async fn toggle_bullet_interaction(
+    report_id: uuid::Uuid,
+    user_id: &str,
+    action: &str,
+    bullet_index: i32,
+    state: Arc<AppState>,
+) -> Result<(bool, i64)> {
+    let mut tx = state.db.begin().await?;
+
+    let row: Option<(bool, bool)> = sqlx::query_as(
+        "SELECT liked, saved FROM bullet_interactions WHERE report_id=$1 AND bullet_index=$2 AND user_id=$3 FOR UPDATE",
+    )
+    .bind(report_id)
+    .bind(bullet_index)
+    .bind(user_id)
+    .fetch_optional(&mut *tx)
+    .await?;
+
+    let (mut liked, mut saved) = row.unwrap_or((false, false));
+    match action {
+        "like" => liked = !liked,
+        "save" => saved = !saved,
+        _ => {}
+    }
+
+    if row.is_some() {
+        sqlx::query(
+            "UPDATE bullet_interactions SET liked=$1, saved=$2, updated_at=now() WHERE report_id=$3 AND bullet_index=$4 AND user_id=$5",
+        )
+        .bind(liked)
+        .bind(saved)
+        .bind(report_id)
+        .bind(bullet_index)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await?;
+    } else {
+        sqlx::query(
+            "INSERT INTO bullet_interactions (report_id, bullet_index, user_id, liked, saved) VALUES ($1,$2,$3,$4,$5)",
+        )
+        .bind(report_id)
+        .bind(bullet_index)
+        .bind(user_id)
+        .bind(liked)
+        .bind(saved)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    let toggled_off = match action {
+        "like" => !liked,
+        _ => !saved,
+    };
+
+    let col = match action {
+        "like" => "liked",
+        _ => "saved",
+    };
+
+    let new_count: i64 = sqlx::query_scalar(&format!(
+        "SELECT COUNT(*) FROM bullet_interactions WHERE report_id=$1 AND bullet_index=$2 AND {col}=true"
+    ))
+    .bind(report_id)
+    .bind(bullet_index)
+    .fetch_one(&mut *tx)
+    .await?;
+
+    tx.commit().await?;
+    Ok((toggled_off, new_count))
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Private helpers
 // ─────────────────────────────────────────────────────────────────────────────
@@ -410,6 +568,8 @@ fn report_to_card(
     cache_status: &str,
     liked: bool,
     saved: bool,
+    bullet_flags: &std::collections::HashMap<(uuid::Uuid, i32), (bool, bool)>,
+    bullet_counts: &std::collections::HashMap<(uuid::Uuid, i32), (i64, i64)>,
 ) -> FeedCard {
     let article_refs: Vec<ArticleRef> = articles
         .into_iter()
@@ -440,6 +600,34 @@ fn report_to_card(
         .map(|a| a.url.clone())
         .unwrap_or_default();
 
+    // Merge bullet metadata
+    let mut bullet_details = r.bullet_summaries.0;
+    for (idx, b) in bullet_details.iter_mut().enumerate() {
+        if let Some((bl, sv)) = bullet_flags.get(&(r.id, idx as i32)) {
+            b.liked = Some(*bl);
+            b.saved = Some(*sv);
+        }
+        if let Some((lc, sc)) = bullet_counts.get(&(r.id, idx as i32)) {
+            b.likes_count = Some(*lc);
+            b.saves_count = Some(*sc);
+        }
+        if b.source_url.is_none() {
+            b.source_url = Some(first_url.clone());
+        }
+        if b.liked.is_none() {
+            b.liked = Some(false);
+        }
+        if b.saved.is_none() {
+            b.saved = Some(false);
+        }
+        if b.likes_count.is_none() {
+            b.likes_count = Some(r.likes_count as i64);
+        }
+        if b.saves_count.is_none() {
+            b.saves_count = Some(r.saves_count as i64);
+        }
+    }
+
     FeedCard {
         id: r.id.to_string(),
         intent: r.intent,
@@ -447,7 +635,7 @@ fn report_to_card(
         risk_level: r.risk_level,
         regions: r.regions,
         bullets: r.bullets.0,
-        bullet_details: r.bullet_summaries.0,
+        bullet_details,
         why_it_matters: r.why_it_matters,
         opportunity_score: r.opportunity_score,
         source: first_source,

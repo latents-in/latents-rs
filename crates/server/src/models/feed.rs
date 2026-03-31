@@ -23,6 +23,7 @@ impl FeedQuery {
 pub struct InteractQuery {
     pub user_id: String,
     pub action: String, // "like" | "save"
+    pub bullet_index: Option<i32>,
 }
 
 // ── Database row types ────────────────────────────────────────────────────────
@@ -177,4 +178,14 @@ pub struct OpenRouterCategoryResponse {
 pub struct BulletDetail {
     pub bullet: String,
     pub summary: String,
+    #[serde(default)]
+    pub liked: Option<bool>,
+    #[serde(default)]
+    pub saved: Option<bool>,
+    #[serde(default)]
+    pub likes_count: Option<i64>,
+    #[serde(default)]
+    pub saves_count: Option<i64>,
+    #[serde(default)]
+    pub source_url: Option<String>,
 }
