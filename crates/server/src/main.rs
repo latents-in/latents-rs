@@ -4,7 +4,7 @@ use axum::{
 };
 use latents_server::{
     config::Config,
-    handlers::{add_to_waitlist, get_waitlist, health_check, serve_static},
+    handlers::{add_to_waitlist, health_check, serve_static},
     state::AppState,
 };
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
@@ -82,7 +82,7 @@ async fn main() -> anyhow::Result<()> {
     let app = Router::new()
         // API routes
         .route("/api/health", get(health_check))
-        .route("/api/waitlist", post(add_to_waitlist).get(get_waitlist))
+        .route("/api/waitlist", post(add_to_waitlist))
         .route("/api/feed", get(latents_server::handlers::get_feed))
         // Static files (catch-all)
         .fallback(serve_static)
